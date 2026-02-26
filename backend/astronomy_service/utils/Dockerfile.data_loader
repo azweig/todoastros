@@ -1,0 +1,15 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Instalar dependencias
+RUN pip install skyfield
+
+# Crear directorio para datos
+RUN mkdir -p /data
+
+# Copiar el script
+COPY utils/populate_astronomical_data.py .
+
+# Comando por defecto
+CMD ["python", "populate_astronomical_data.py", "/data/astronomical_data.db"]

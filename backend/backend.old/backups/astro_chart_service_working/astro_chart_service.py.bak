@@ -1,0 +1,443 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
+import requests
+import os
+import json
+from datetime import datetime
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("astro_chart_service.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("astro_chart_service")
+
+app = Flask(__name__)
+CORS(app)
+
+# URLs de los servicios
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth_service:5050")
+ASTRONOMY_SERVICE_URL = os.environ.get("ASTRONOMY_SERVICE_URL", "http://astronomy_service:5003/astronomy")
+ZODIAC_SERVICE_URL = os.environ.get("ZODIAC_SERVICE_URL", "http://zodiac_service:5001/zodiac")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://openai_service:5010")
+
+def verify_api_key(api_key):
+    """Verifica la validez de la API key con el servicio de autenticación."""
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/auth/verify",
+            json={"api_key": api_key}
+        )
+        return response.status_code == 200 and response.json().get("valid", False)
+    except Exception as e:
+        logger.error(f"Error al verificar API key: {str(e)}")
+        return False
+
+def get_astronomical_data(date_of_birth, api_key):
+    """Obtiene datos astronómicos para la fecha de nacimiento."""
+    try:
+        # Obtener posiciones planetarias y fase lunar
+        response = requests.get(
+            f"{ASTRONOMY_SERVICE_URL}/date_info",
+            params={"date": date_of_birth},
+            headers={"X-API-Key": api_key}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Error al obtener datos astronómicos: {response.text}")
+            return None
+
+        return response.json()
+    except Exception as e:
+        logger.error(f"Error al obtener datos astronómicos: {str(e)}")
+        return None
+
+def get_zodiac_data(date_of_birth, api_key):
+    """Obtiene datos del zodíaco para la fecha de nacimiento."""
+    try:
+        response = requests.post(
+            f"{ZODIAC_SERVICE_URL}",
+            json={"date_of_birth": date_of_birth},
+            headers={"X-API-Key": api_key}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Error al obtener datos del zodíaco: {response.text}")
+            return None
+
+        return response.json()
+    except Exception as e:
+        logger.error(f"Error al obtener datos del zodíaco: {str(e)}")
+        return None
+
+def calculate_ascendant(date_of_birth, time_of_birth, latitude, longitude):
+    """
+    Calcula el ascendente basado en la fecha, hora y coordenadas.
+    Esta es una simplificación; en la realidad, se necesitaría una biblioteca astronómica más compleja.
+    """
+    # Implementación simplificada para demostración
+    # En un sistema real, usaríamos una biblioteca como pyswisseph o skyfield
+
+    # Convertir la hora a decimal
+    hour, minute = map(int, time_of_birth.split(':'))
+    decimal_time = hour + minute / 60.0
+
+    # Convertir la fecha a día del año (0-365)
+    date_obj = datetime.strptime(date_of_birth, "%Y-%m-%d")
+    day_of_year = date_obj.timetuple().tm_yday
+
+    # Cálculo simplificado del ascendente
+    # Este es un cálculo muy aproximado y no debe usarse en producción
+    ascendant_signs = [
+        "Aries", "Tauro", "Géminis", "Cáncer", "Leo", "Virgo",
+        "Libra", "Escorpio", "Sagitario", "Capricornio", "Acuario", "Piscis"
+    ]
+
+    # Fórmula simplificada basada en la hora y día del año
+    # En realidad, el cálculo del ascendente es mucho más complejo
+    index = (day_of_year // 30 + int(decimal_time) // 2) % 12
+
+    return ascendant_signs[index]
+
+def get_current_transits(api_key):
+    """Obtiene los tránsitos planetarios actuales."""
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Obtener posiciones planetarias actuales
+        response = requests.get(
+            f"{ASTRONOMY_SERVICE_URL}/all_planets",
+            params={"date": today},
+            headers={"X-API-Key": api_key}
+        )
+
+        if response.status_code != 200:
+            logger.warning(f"No se pudieron obtener tránsitos actuales: {response.text}")
+            # Usar una fecha para la que sabemos que hay datos
+            fallback_date = "2023-01-01"
+            logger.info(f"Intentando con fecha alternativa: {fallback_date}")
+            response = requests.get(
+                f"{ASTRONOMY_SERVICE_URL}/all_planets",
+                params={"date": fallback_date},
+                headers={"X-API-Key": api_key}
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Error al obtener tránsitos con fecha alternativa: {response.text}")
+                return None
+
+        return response.json()
+    except Exception as e:
+        logger.error(f"Error al obtener tránsitos actuales: {str(e)}")
+        return None
+
+def generate_astro_chart(data, api_key):
+    """Genera la carta astral utilizando OpenAI."""
+    try:
+        full_name = f"{data.get('first_name', '')} {data.get('last_name', '')}".strip()
+        name_text = f" para {full_name}" if full_name else ""
+
+        prompt = f"""Escribe una carta astral detallada{name_text} en un estilo literario evocador y personalizado, combinando elementos de los estilos de autores como Rosa María Cifuentes, Linda Goodman, Liz Greene, Stephen Arroyo, Donna Cunningham, Dane Rudhyar, Howard Sasportas, Alejandro Lodi, Patricia Kesselman, Walter Mercado, Beatriz Leveratto y Mónica Maldonado. La carta debe integrar un enfoque espiritual, psicológico y práctico, fusionando aspectos de la astrología clásica y moderna.
+
+Dirígete directamente al lector, por ejemplo: '{full_name}, naciste el {data['date_of_birth']} a las {data['time_of_birth']} en {data['city_of_birth']}...', y utiliza un tono reflexivo y accesible. Incluye una descripción profunda de los aspectos esenciales de la carta natal (signo solar, ascendente, Luna y aspectos planetarios relevantes) y destaca cómo estos influyen en la personalidad y el destino.
+
+Además, incorpora reflexiones sobre la influencia de los tránsitos planetarios actuales en diferentes áreas de la vida, y sugiere estrategias prácticas para el crecimiento personal y la toma de decisiones (por ejemplo, recomendaciones en ámbitos como el amor, la carrera y la salud financiera).
+
+La narrativa debe ser poética pero realista, equilibrando la belleza del lenguaje con consejos prácticos y aplicables para el camino personal y profesional del individuo.
+
+Aquí están los datos astrológicos y astronómicos para esta persona:
+
+Nombre: {full_name}
+Fecha de nacimiento: {data['date_of_birth']}
+Hora de nacimiento: {data['time_of_birth']}
+Lugar de nacimiento: {data['city_of_birth']}
+
+Signo solar: {data['zodiac_data']['western_zodiac']}
+Signo lunar: {data.get('moon_sign', 'No disponible')}
+Ascendente: {data['ascendant']}
+Signo chino: {data['zodiac_data']['chinese_zodiac']}
+Signo védico: {data['zodiac_data']['vedic_zodiac']}
+Signo maya: {data['zodiac_data']['mayan_zodiac']}
+Signo celta: {data['zodiac_data']['celtic_zodiac']}
+
+Fase lunar en el nacimiento: {data['astronomy_data']['moon_phase']['phase']}
+
+Posiciones planetarias en el nacimiento:
+{data['planetary_positions_text']}
+
+Tránsitos planetarios actuales:
+{data['current_transits_text']}
+
+Por favor, genera una carta astral completa y personalizada basada en estos datos.
+"""
+
+        logger.info(f"URL del servicio OpenAI: {OPENAI_SERVICE_URL}")
+        logger.info(f"Enviando solicitud a OpenAI con prompt de {len(prompt)} caracteres")
+
+        # Enviar solicitud a OpenAI
+        full_url = f"{OPENAI_SERVICE_URL}/generate"
+        logger.info(f"URL completa: {full_url}")
+
+        response = requests.post(
+            full_url,
+            json={
+                "prompt": prompt,
+                "max_tokens": 2000,
+                "temperature": 0.7
+            },
+            headers={"X-API-Key": api_key}
+        )
+
+        logger.info(f"Respuesta de OpenAI: Código {response.status_code}")
+        logger.info(f"Respuesta de OpenAI: {response.text[:500]}...")  # Mostrar los primeros 500 caracteres
+
+        if response.status_code != 200:
+            logger.error(f"Error al generar carta astral con OpenAI: {response.text}")
+            return None
+
+        result = response.json()
+        logger.info(f"Texto generado: {len(result.get('text', ''))} caracteres")
+
+        return result.get("text")
+    except Exception as e:
+        logger.error(f"Error al generar carta astral: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
+
+def generate_numerology_analysis(data, api_key):
+    """Genera un análisis numerológico utilizando OpenAI."""
+    try:
+        first_name = data.get('first_name', '')
+        last_name = data.get('last_name', '')
+        full_name = f"{first_name} {last_name}".strip()
+        date_of_birth = data.get('date_of_birth', '')
+        
+        # Extraer componentes de la fecha de nacimiento
+        try:
+            birth_date = datetime.strptime(date_of_birth, "%Y-%m-%d")
+            day = birth_date.day
+            month = birth_date.month
+            year = birth_date.year
+        except:
+            logger.warning(f"Error al procesar la fecha de nacimiento: {date_of_birth}")
+            day = month = year = "No disponible"
+
+        prompt = f"""Escribe un análisis numerológico detallado para {full_name}, basado en su nombre completo y fecha de nacimiento ({date_of_birth}). 
+
+Emplea metodologías reconocidas en la numerología pitagórica y cabalística, inspirándote en las obras de numerólogos renombrados como Cheiro, Glynis McCants, Dan Millman y otros. La respuesta debe incluir:
+
+1. La asignación de valores numéricos a cada letra del nombre completo ({full_name}), con sus respectivas reducciones, para calcular el Número de Expresión, el Número del Alma y el Número de Personalidad.
+
+2. El cálculo del Número de Destino a partir de la suma y reducción de la fecha de nacimiento ({day}/{month}/{year}).
+
+3. Un análisis cabalístico que incluya la suma de los números y sus interpretaciones místicas, revelando aspectos profundos de la personalidad, las oportunidades y los desafíos.
+
+4. Reflexiones sobre cómo estos números se relacionan y cómo pueden influir en el camino vital del individuo, incluyendo estrategias prácticas para potenciar su crecimiento personal y superar obstáculos.
+
+Utiliza un lenguaje evocador, accesible y reflexivo, que combine precisión analítica con un toque espiritual, para ofrecer una guía integral de autoconocimiento a {first_name}.
+"""
+
+        logger.info(f"Enviando solicitud a OpenAI para análisis numerológico con prompt de {len(prompt)} caracteres")
+
+        # Enviar solicitud a OpenAI
+        full_url = f"{OPENAI_SERVICE_URL}/generate"
+        logger.info(f"URL completa: {full_url}")
+
+        response = requests.post(
+            full_url,
+            json={
+                "prompt": prompt,
+                "max_tokens": 2000,
+                "temperature": 0.7
+            },
+            headers={"X-API-Key": api_key}
+        )
+
+        logger.info(f"Respuesta de OpenAI: Código {response.status_code}")
+        logger.info(f"Respuesta de OpenAI: {response.text[:500]}...")  # Mostrar los primeros 500 caracteres
+
+        if response.status_code != 200:
+            logger.error(f"Error al generar análisis numerológico con OpenAI: {response.text}")
+            return None
+
+        result = response.json()
+        logger.info(f"Texto generado: {len(result.get('text', ''))} caracteres")
+
+        return result.get("text")
+    except Exception as e:
+        logger.error(f"Error al generar análisis numerológico: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Endpoint para verificar la salud del servicio."""
+    return jsonify({"status": "up"}), 200
+
+@app.route('/astro_chart', methods=['POST'])
+def astro_chart():
+    """Endpoint principal para generar una carta astral."""
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+
+    # Obtener datos de la solicitud
+    data = request.get_json()
+    first_name = data.get('first_name', '')  # Nuevo campo
+    last_name = data.get('last_name', '')    # Nuevo campo
+    date_of_birth = data.get('date_of_birth')
+    time_of_birth = data.get('time_of_birth')
+    city_of_birth = data.get('city_of_birth')
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+
+    # Validar datos requeridos
+    if not all([date_of_birth, time_of_birth, city_of_birth]):
+        logger.warning("Solicitud con datos incompletos")
+        return jsonify({"error": "Faltan datos obligatorios (fecha, hora o lugar de nacimiento)"}), 400
+
+    try:
+        # Obtener datos astronómicos
+        astronomy_data = get_astronomical_data(date_of_birth, api_key)
+        if not astronomy_data:
+            return jsonify({"error": "No se pudieron obtener datos astronómicos"}), 500
+
+        # Obtener datos del zodíaco
+        zodiac_data = get_zodiac_data(date_of_birth, api_key)
+        if not zodiac_data:
+            return jsonify({"error": "No se pudieron obtener datos del zodíaco"}), 500
+
+        # Calcular ascendente
+        ascendant = calculate_ascendant(date_of_birth, time_of_birth, latitude, longitude)
+
+        # Obtener tránsitos actuales
+        current_transits = get_current_transits(api_key)
+        if not current_transits:
+            return jsonify({"error": "No se pudieron obtener tránsitos actuales"}), 500
+
+        # Preparar datos para el prompt
+        planetary_positions_text = ""
+        for planet in astronomy_data.get('planetary_positions', []):
+            planetary_positions_text += f"- {planet['planet']}: Ascensión recta {planet['right_ascension']:.2f} horas, Declinación {planet['declination']:.2f} grados\n"
+
+        current_transits_text = ""
+        for planet in current_transits.get('planets', []):
+            current_transits_text += f"- {planet['planet']}: Ascensión recta {planet['right_ascension']:.2f} horas, Declinación {planet['declination']:.2f} grados\n"
+
+        # Determinar el signo lunar (simplificado)
+        moon_sign = "No disponible"  # En un sistema real, calcularíamos esto basado en la posición lunar
+
+        # Preparar datos completos para la generación
+        chart_data = {
+            'first_name': first_name,
+            'last_name': last_name,
+            'date_of_birth': date_of_birth,
+            'time_of_birth': time_of_birth,
+            'city_of_birth': city_of_birth,
+            'astronomy_data': astronomy_data,
+            'zodiac_data': zodiac_data,
+            'ascendant': ascendant,
+            'moon_sign': moon_sign,
+            'planetary_positions_text': planetary_positions_text,
+            'current_transits_text': current_transits_text
+        }
+
+        # Generar la carta astral
+        astro_chart_text = generate_astro_chart(chart_data, api_key)
+        if not astro_chart_text:
+            return jsonify({"error": "No se pudo generar la carta astral"}), 500
+
+        # Preparar respuesta
+        response = {
+            "astro_chart": astro_chart_text,
+            "data": {
+                "personal_info": {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "date_of_birth": date_of_birth,
+                    "time_of_birth": time_of_birth,
+                    "city_of_birth": city_of_birth
+                },
+                "astrological_info": {
+                    "sun_sign": zodiac_data['western_zodiac'],
+                    "moon_sign": moon_sign,
+                    "ascendant": ascendant,
+                    "chinese_sign": zodiac_data['chinese_zodiac'],
+                    "vedic_sign": zodiac_data['vedic_zodiac'],
+                    "mayan_sign": zodiac_data['mayan_zodiac'],
+                    "celtic_sign": zodiac_data['celtic_zodiac']
+                },
+                "moon_phase": astronomy_data['moon_phase']['phase']
+            }
+        }
+
+        logger.info(f"Carta astral generada exitosamente para {date_of_birth}")
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud de carta astral: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+@app.route('/numerology', methods=['POST'])
+def numerology():
+    """Endpoint para generar un análisis numerológico."""
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+
+    # Obtener datos de la solicitud
+    data = request.get_json()
+    first_name = data.get('first_name', '')
+    last_name = data.get('last_name', '')
+    date_of_birth = data.get('date_of_birth')
+
+    # Validar datos requeridos
+    if not all([first_name, date_of_birth]):
+        logger.warning("Solicitud con datos incompletos")
+        return jsonify({"error": "Faltan datos obligatorios (nombre o fecha de nacimiento)"}), 400
+
+    try:
+        # Preparar datos para el análisis numerológico
+        numerology_data = {
+            'first_name': first_name,
+            'last_name': last_name,
+            'date_of_birth': date_of_birth
+        }
+
+        # Generar el análisis numerológico
+        numerology_text = generate_numerology_analysis(numerology_data, api_key)
+        if not numerology_text:
+            return jsonify({"error": "No se pudo generar el análisis numerológico"}), 500
+
+        # Preparar respuesta
+        response = {
+            "numerology_analysis": numerology_text,
+            "data": {
+                "personal_info": {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "date_of_birth": date_of_birth
+                }
+            }
+        }
+
+        logger.info(f"Análisis numerológico generado exitosamente para {first_name} {last_name}")
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud de análisis numerológico: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=5015)

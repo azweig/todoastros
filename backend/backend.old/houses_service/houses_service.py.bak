@@ -1,0 +1,179 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
+import requests
+import os
+import json
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("houses_service.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("houses_service")
+
+app = Flask(__name__)
+CORS(app)
+
+# URLs de los servicios
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth_service:5050")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://openai_service:5010")
+
+def verify_api_key(api_key):
+    """Verifica la validez de la API key con el servicio de autenticación."""
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/auth/verify",
+            json={"api_key": api_key}
+        )
+        return response.status_code == 200 and response.json().get("valid", False)
+    except Exception as e:
+        logger.error(f"Error al verificar API key: {str(e)}")
+        return False
+
+def generate_houses_analysis(data, api_key):
+    """Genera un análisis detallado de las casas astrológicas utilizando OpenAI."""
+    try:
+        house_placements = data.get('house_placements', [])
+        
+        # Crear un texto con las posiciones planetarias por casa
+        placements_text = ""
+        for placement in house_placements:
+            placements_text += f"- {placement['planet']} en Casa {placement['house']} ({placement['sign']})\n"
+        
+        prompt = f"""Genera un análisis detallado de las 12 casas astrológicas para una carta natal con las siguientes posiciones planetarias:
+
+{placements_text}
+
+El análisis debe incluir:
+
+1. Una interpretación profunda de cada una de las 12 casas, incluso aquellas sin planetas, basada en los signos que las rigen.
+2. Un análisis detallado de las casas que contienen planetas, explicando cómo la energía de cada planeta se manifiesta en ese área de la vida.
+3. Identificación de las casas angulares (1, 4, 7, 10) y su importancia en la carta.
+4. Análisis de las casas sucedentes (2, 5, 8, 11) y cadentes (3, 6, 9, 12) y su dinámica en la vida de la persona.
+5. Identificación de patrones como stelliums (agrupaciones de planetas) en casas específicas.
+6. Recomendaciones prácticas para trabajar con la energía de cada casa, especialmente aquellas que presentan desafíos o oportunidades significativas.
+
+Basa tu análisis en las enseñanzas de astrólogos reconocidos como Howard Sasportas, Dane Rudhyar, Liz Greene y Steven Forrest, combinando la astrología tradicional con enfoques psicológicos modernos.
+
+Utiliza un lenguaje accesible pero profundo, que ofrezca tanto comprensión teórica como aplicaciones prácticas para el desarrollo personal.
+"""
+
+        logger.info(f"Enviando solicitud a OpenAI para análisis de casas astrológicas")
+
+        # Enviar solicitud a OpenAI
+        full_url = f"{OPENAI_SERVICE_URL}/generate"
+        logger.info(f"URL completa: {full_url}")
+
+        response = requests.post(
+            full_url,
+            json={
+                "prompt": prompt,
+                "max_tokens": 2500,
+                "temperature": 0.7
+            },
+            headers={"X-API-Key": api_key}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Error al generar análisis de casas: {response.text}")
+            return None
+
+        result = response.json()
+        logger.info(f"Texto generado: {len(result.get('text', ''))} caracteres")
+
+        return result.get("text")
+    except Exception as e:
+        logger.error(f"Error al generar análisis de casas: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Endpoint para verificar la salud del servicio."""
+    return jsonify({"status": "up"}), 200
+
+@app.route('/houses', methods=['POST'])
+def houses():
+    """Endpoint para generar un análisis de casas astrológicas."""
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+
+    # Obtener datos de la solicitud
+    data = request.get_json()
+    house_placements = data.get('house_placements', [])
+
+    # Validar datos requeridos
+    if not house_placements:
+        logger.warning("Solicitud con datos incompletos")
+        return jsonify({"error": "Faltan datos de posiciones planetarias en casas"}), 400
+
+    try:
+        # Generar el análisis de casas
+        houses_text = generate_houses_analysis(data, api_key)
+        if not houses_text:
+            return jsonify({"error": "No se pudo generar el análisis de casas"}), 500
+
+        # Preparar datos estructurados para cada casa
+        houses_data = []
+        for i in range(1, 13):
+            # Filtrar planetas en esta casa
+            planets_in_house = [p for p in house_placements if p['house'] == i]
+            planet_names = [p['planet'] for p in planets_in_house]
+            
+            # Crear descripción básica (en una implementación real, esto sería más detallado)
+            description = "Sin planetas en esta casa."
+            if planets_in_house:
+                description = f"Contiene {', '.join(planet_names)}."
+            
+            houses_data.append({
+                "house_number": i,
+                "name": get_house_name(i),
+                "planets": planet_names,
+                "description": description
+            })
+
+        # Preparar respuesta
+        response = {
+            "houses_analysis": houses_text,
+            "houses_data": houses_data,
+            "data": {
+                "house_placements": house_placements
+            }
+        }
+
+        logger.info(f"Análisis de casas generado exitosamente")
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud de análisis de casas: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+def get_house_name(house_number):
+    """Retorna el nombre de la casa según su número."""
+    house_names = {
+        1: "Casa de la Identidad (Self)",
+        2: "Casa de los Valores y Posesiones",
+        3: "Casa de la Comunicación",
+        4: "Casa del Hogar y la Familia",
+        5: "Casa de la Creatividad y el Placer",
+        6: "Casa del Servicio y la Salud",
+        7: "Casa de las Relaciones",
+        8: "Casa de la Transformación",
+        9: "Casa de la Filosofía y los Viajes",
+        10: "Casa de la Carrera y el Estatus Social",
+        11: "Casa de las Amistades y Aspiraciones",
+        12: "Casa del Subconsciente y la Espiritualidad"
+    }
+    return house_names.get(house_number, f"Casa {house_number}")
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=5030)

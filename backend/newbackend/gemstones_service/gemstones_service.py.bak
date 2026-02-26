@@ -1,0 +1,399 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
+import requests
+import os
+import json
+import sqlite3
+import hashlib
+from datetime import datetime
+
+
+def get_mock_gemstones_response(sign, name=None):
+    """Genera una respuesta simulada para cuando OpenAI no está disponible"""
+    mock_responses = {
+        "Aries": """
+# Gemas y Cristales para Aries
+
+## 1. Diamante
+- **Propiedades**: Fuerza, claridad mental, pureza
+- **Beneficios para Aries**: Potencia tu liderazgo natural y ayuda a canalizar tu energía de manera constructiva
+- **Uso recomendado**: Joyería, especialmente anillos o colgantes cerca del corazón
+- **Combinaciones**: Con rubí para aumentar la pasión y determinación
+
+## 2. Rubí
+- **Propiedades**: Pasión, vitalidad, protección
+- **Beneficios para Aries**: Equilibra tu naturaleza impulsiva mientras mantiene tu entusiasmo
+- **Uso recomendado**: Brazalete o anillo en la mano dominante
+- **Combinaciones**: Con cuarzo transparente para mayor claridad en decisiones
+
+## 3. Jaspe Rojo
+- **Propiedades**: Estabilidad, fuerza, resistencia
+- **Beneficios para Aries**: Ayuda a mantener la calma en situaciones estresantes
+- **Uso recomendado**: Llevar en el bolsillo o como piedra de meditación
+- **Combinaciones**: Con ónix para protección adicional
+
+## 4. Granate
+- **Propiedades**: Energía, pasión, regeneración
+- **Beneficios para Aries**: Potencia tu creatividad y te ayuda a manifestar tus ideas
+- **Uso recomendado**: Colgante cerca del chakra raíz o sacro
+- **Combinaciones**: Con amatista para equilibrar la energía física y espiritual
+
+## 5. Ágata de Fuego
+- **Propiedades**: Coraje, protección, vitalidad
+- **Beneficios para Aries**: Transforma la energía agresiva en fuerza creativa
+- **Uso recomendado**: Decoración en espacios de trabajo o estudio
+- **Combinaciones**: Con citrino para aumentar la prosperidad y éxito
+""",
+        "Tauro": """
+# Gemas y Cristales para Tauro
+
+## 1. Esmeralda
+- **Propiedades**: Abundancia, amor, paciencia
+- **Beneficios para Tauro**: Refuerza tu conexión con la naturaleza y potencia tu estabilidad
+- **Uso recomendado**: Anillos o colgantes cerca del corazón
+- **Combinaciones**: Con jade para aumentar la prosperidad
+
+## 2. Cuarzo Rosa
+- **Propiedades**: Amor incondicional, paz, compasión
+- **Beneficios para Tauro**: Suaviza tu terquedad y te ayuda a expresar tus emociones
+- **Uso recomendado**: Llevar cerca del corazón o en espacios de descanso
+- **Combinaciones**: Con turmalina verde para equilibrio emocional
+
+## 3. Jade
+- **Propiedades**: Armonía, suerte, protección
+- **Beneficios para Tauro**: Potencia tu capacidad para atraer abundancia y estabilidad
+- **Uso recomendado**: Brazaletes o figuras decorativas en el hogar
+- **Combinaciones**: Con citrino para manifestación material
+
+## 4. Turmalina Verde
+- **Propiedades**: Equilibrio, regeneración, crecimiento
+- **Beneficios para Tauro**: Ayuda a adaptarte al cambio manteniendo tu centro
+- **Uso recomendado**: Llevar en contacto con la piel durante meditación
+- **Combinaciones**: Con cuarzo transparente para claridad mental
+
+## 5. Aventurina
+- **Propiedades**: Prosperidad, liderazgo, decisión
+- **Beneficios para Tauro**: Potencia tu determinación y perseverancia
+- **Uso recomendado**: Llevar en el bolsillo o como piedra de bolsillo
+- **Combinaciones**: Con ágata para estabilidad adicional
+"""
+    }
+    
+    # Respuesta por defecto si el signo no está en nuestro diccionario
+    default_response = """
+# Gemas y Cristales Universales
+
+## 1. Cuarzo Transparente
+- **Propiedades**: Claridad, amplificación, equilibrio
+- **Beneficios**: Ayuda a clarificar pensamientos y amplifica la energía de otras piedras
+- **Uso recomendado**: Meditación, joyería o decoración
+- **Combinaciones**: Funciona bien con todas las demás piedras
+
+## 2. Amatista
+- **Propiedades**: Calma, intuición, protección
+- **Beneficios**: Equilibra emociones y mejora la conexión espiritual
+- **Uso recomendado**: Cerca de la cabeza durante el descanso o meditación
+- **Combinaciones**: Con cuarzo rosa para amor y compasión
+
+## 3. Turmalina Negra
+- **Propiedades**: Protección, enraizamiento, purificación
+- **Beneficios**: Absorbe y transforma energías negativas
+- **Uso recomendado**: En entradas de hogares u oficinas
+- **Combinaciones**: Con cuarzo transparente para amplificar su protección
+
+## 4. Lapislázuli
+- **Propiedades**: Sabiduría, verdad, comunicación
+- **Beneficios**: Mejora la expresión personal y la búsqueda de conocimiento
+- **Uso recomendado**: Colgante cerca de la garganta
+- **Combinaciones**: Con amatista para mayor intuición
+
+## 5. Citrino
+- **Propiedades**: Abundancia, confianza, energía positiva
+- **Beneficios**: Atrae prosperidad y mantiene un estado de ánimo positivo
+- **Uso recomendado**: En espacios de trabajo o bolsillos
+- **Combinaciones**: Con cuarzo ahumado para manifestación práctica
+"""
+    
+    # Obtener la respuesta para el signo específico o usar la respuesta por defecto
+    gemstones_text = mock_responses.get(sign, default_response)
+    
+    # Personalizar con el nombre si está disponible
+    if name:
+        gemstones_text = f"# Gemas y Cristales para {name} ({sign})\n" + gemstones_text.split('\n', 1)[1]
+    
+    return gemstones_text
+# Configuración de logging
+logging.basicConfig(
+level=logging.INFO,
+format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+handlers=[
+    logging.FileHandler("gemstones_service.log"),
+    logging.StreamHandler()
+]
+)
+logger = logging.getLogger("gemstones_service")
+
+app = Flask(__name__)
+CORS(app)
+
+# URLs de los servicios
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth_service:5050")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://openai_service:5010/generate")
+
+# Configuración de la base de datos
+DB_PATH = "/data/gemstones_responses.db"
+
+def init_db():
+    """Inicializa la base de datos."""
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Crear tabla para almacenar respuestas
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS responses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        query_hash TEXT UNIQUE NOT NULL,
+        response_data TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+    logger.info("Base de datos inicializada")
+
+def get_query_hash(data):
+    """Genera un hash único para la consulta."""
+    if isinstance(data, dict):
+        # Eliminar campos que no deben afectar el hash (como timestamps)
+        data_copy = data.copy()
+        if 'generated_at' in data_copy:
+            del data_copy['generated_at']
+        
+        # Convertir a string y generar hash
+        data_str = json.dumps(data_copy, sort_keys=True)
+    else:
+        data_str = str(data)
+        
+    return hashlib.md5(data_str.encode()).hexdigest()
+
+def get_stored_response(query_hash):
+    """Obtiene una respuesta almacenada si existe."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT response_data FROM responses WHERE query_hash = ?",
+        (query_hash,)
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if result:
+        response_data = json.loads(result[0])
+        return response_data
+
+    return None
+
+def store_response(query_hash, response):
+    """Almacena una respuesta en la base de datos."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    response_json = json.dumps(response)
+    now = datetime.now().isoformat()
+
+    try:
+        cursor.execute(
+            "INSERT OR REPLACE INTO responses (query_hash, response_data, created_at) VALUES (?, ?, ?)",
+            (query_hash, response_json, now)
+        )
+        conn.commit()
+        logger.info(f"Respuesta almacenada con hash: {query_hash}")
+    except Exception as e:
+        logger.error(f"Error al almacenar respuesta: {str(e)}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+# Inicializar la base de datos al arrancar
+init_db()
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Endpoint para verificar la salud del servicio."""
+    return jsonify({"status": "up"}), 200
+
+
+@app.route('/gemstones', methods=['POST'])
+def gemstones():
+    """Endpoint para obtener información sobre gemas y cristales para un signo zodiacal."""
+    try:
+        # Obtener datos de la solicitud
+        data = request.get_json()
+        sign = data.get('sign', '')
+        name = data.get('name', '')
+        birth_date = data.get('birth_date', '')
+        chinese_sign = data.get('chinese_sign', '')
+        vedic_sign = data.get('vedic_sign', '')
+        use_mock = data.get('mock', False)  # Parámetro para forzar datos simulados
+
+        # Validar datos requeridos
+        if not sign:
+            logger.warning("Solicitud con datos incompletos")
+            return jsonify({"error": "Falta el signo zodiacal"}), 400
+
+        # Generar hash para la consulta
+        query_data = {
+            "sign": sign,
+            "name": name,
+            "birth_date": birth_date,
+            "chinese_sign": chinese_sign,
+            "vedic_sign": vedic_sign
+        }
+        query_hash = get_query_hash(query_data)
+
+        # Verificar si ya existe una respuesta almacenada
+        stored_response = get_stored_response(query_hash)
+        if stored_response:
+            logger.info(f"Usando respuesta almacenada para signo {sign}")
+            return jsonify(stored_response)
+
+        # Si se solicita usar datos simulados o hay un problema con OpenAI, usar datos simulados
+        if use_mock:
+            logger.info(f"Usando datos simulados para signo {sign}")
+            gemstones_text = get_mock_gemstones_response(sign, name)
+            
+            # Preparar respuesta
+            response_data = {
+                "gemstones_info": gemstones_text,
+                "sign": sign,
+                "name": name if name else "No especificado",
+                "birth_date": birth_date if birth_date else "No especificado",
+                "chinese_sign": chinese_sign if chinese_sign else "No especificado",
+                "vedic_sign": vedic_sign if vedic_sign else "No especificado",
+                "is_mock": True
+            }
+            
+            # Almacenar en la base de datos
+            store_response(query_hash, response_data)
+            
+            logger.info(f"Información simulada sobre gemas generada para {sign}")
+            return jsonify(response_data)
+
+        # Preparar el prompt para OpenAI
+        prompt = f"""Proporciona información detallada sobre las gemas y cristales más beneficiosos para una persona con:
+
+- Signo zodiacal occidental: {sign}"""
+
+        if chinese_sign:
+            prompt += f"""
+- Signo zodiacal chino: {chinese_sign}"""
+        
+        if vedic_sign:
+            prompt += f"""
+- Signo zodiacal védico: {vedic_sign}"""
+            
+        if birth_date:
+            prompt += f"""
+- Fecha de nacimiento: {birth_date}"""
+            
+        if name:
+            prompt += f"""
+
+Esta información es personalizada para {name}."""
+            
+        prompt += """
+
+Para cada gema o cristal, incluye:
+1. Nombre de la gema/cristal
+2. Propiedades energéticas y metafísicas
+3. Cómo beneficia específicamente a esta persona según sus signos zodiacales
+4. Formas recomendadas de uso (joyería, decoración, meditación, etc.)
+5. Combinaciones con otras gemas para potenciar efectos específicos
+
+Incluye al menos 5 gemas o cristales diferentes, ordenados por su nivel de beneficio para esta persona."""
+
+        # Enviar solicitud a OpenAI
+        logger.info(f"Enviando solicitud a OpenAI: {OPENAI_SERVICE_URL}")
+        try:
+            response = requests.post(
+                OPENAI_SERVICE_URL,
+                json={
+                    "prompt": prompt,
+                    "max_tokens": 2000,
+                    "temperature": 0.7
+                },
+                timeout=10  # Añadir timeout para evitar esperas largas
+            )
+            
+            # Verificar respuesta
+            if response.status_code != 200:
+                logger.error(f"Error al llamar a OpenAI: {response.status_code} - {response.text}")
+                # Si hay error con OpenAI, usar datos simulados como fallback
+                logger.info(f"Usando datos simulados como fallback para signo {sign}")
+                gemstones_text = get_mock_gemstones_response(sign, name)
+                
+                # Indicar que es una respuesta simulada
+                response_data = {
+                    "gemstones_info": gemstones_text,
+                    "sign": sign,
+                    "name": name if name else "No especificado",
+                    "birth_date": birth_date if birth_date else "No especificado",
+                    "chinese_sign": chinese_sign if chinese_sign else "No especificado",
+                    "vedic_sign": vedic_sign if vedic_sign else "No especificado",
+                    "is_mock": True
+                }
+                
+                # Almacenar en la base de datos
+                store_response(query_hash, response_data)
+                
+                logger.info(f"Información simulada sobre gemas generada para {sign} (fallback)")
+                return jsonify(response_data)
+                
+            # Extraer texto generado
+            result = response.json()
+            gemstones_text = result.get("text", "")
+            if not gemstones_text:
+                logger.error("No se recibió texto de OpenAI")
+                # Usar datos simulados como fallback
+                gemstones_text = get_mock_gemstones_response(sign, name)
+                is_mock = True
+            else:
+                is_mock = False
+                
+        except Exception as e:
+            logger.error(f"Error al conectar con OpenAI: {str(e)}")
+            # Usar datos simulados como fallback
+            gemstones_text = get_mock_gemstones_response(sign, name)
+            is_mock = True
+
+        # Preparar respuesta
+        response_data = {
+            "gemstones_info": gemstones_text,
+            "sign": sign,
+            "name": name if name else "No especificado",
+            "birth_date": birth_date if birth_date else "No especificado",
+            "chinese_sign": chinese_sign if chinese_sign else "No especificado",
+            "vedic_sign": vedic_sign if vedic_sign else "No especificado",
+            "is_mock": is_mock
+        }
+
+        # Almacenar en la base de datos
+        store_response(query_hash, response_data)
+
+        logger.info(f"Información sobre gemas generada exitosamente para {sign}")
+        return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=5035)
+

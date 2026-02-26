@@ -1,0 +1,20 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Instalar dependencias con versiones específicas
+RUN pip install --no-cache-dir flask==2.0.1 werkzeug==2.0.1 requests==2.26.0 pyjwt==2.1.0
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /app/data
+VOLUME /app/data
+
+# Cambiar al directorio de datos para las bases de datos
+WORKDIR /app/data
+
+# Volver al directorio de la aplicación
+WORKDIR /app
+
+CMD ["python", "auth_service.py"]

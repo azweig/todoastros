@@ -1,0 +1,142 @@
+from flask import Flask, request, jsonify
+import requests
+import sqlite3
+import logging
+import os
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("news_service.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("news_service")
+
+app = Flask(__name__)
+
+# URL del servicio de autenticación
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://localhost:5050")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://localhost:5010/openai")
+
+def verify_api_key(api_key):
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/auth/verify",
+            json={"api_key": api_key}
+        )
+        return response.status_code == 200 and response.json().get("valid", False)
+    except Exception as e:
+        logger.error(f"Error al verificar API key: {str(e)}")
+        return False
+
+def init_db():
+    conn = sqlite3.connect('news.db')
+    cursor = conn.cursor()
+    
+    # Tabla para caché de noticias
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS news_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        city TEXT NOT NULL,
+        date TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(city, date)
+    )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "up"}), 200
+
+@app.route('/news', methods=['POST'])
+def news_report():
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+    
+    data = request.get_json()
+    city_of_birth = data.get('city_of_birth')
+    date_of_birth = data.get('date_of_birth')
+
+    if not all([city_of_birth, date_of_birth]):
+        logger.warning("Solicitud sin datos obligatorios")
+        return jsonify({"error": "Faltan datos obligatorios: city_of_birth, date_of_birth"}), 400
+
+    try:
+        # Verificar si ya existe en la base de datos
+        conn = sqlite3.connect('news.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT summary FROM news_cache WHERE city = ? AND date = ?', (city_of_birth, date_of_birth))
+        cached_result = cursor.fetchone()
+
+        if cached_result:
+            logger.info(f"Resumen de noticias recuperado de caché para {date_of_birth} en {city_of_birth}")
+            conn.close()
+            return jsonify({
+                "city_of_birth": city_of_birth,
+                "date_of_birth": date_of_birth,
+                "news_summary": cached_result[0]
+            }), 200
+
+        # Crear el prompt
+        prompt = f"""
+        Actúa como un experto en futurología y astrología, especializado en brindar mensajes personalizados y reflexivos.
+        Quiero que redactes un mensaje especial para alguien nacido el {date_of_birth} en {city_of_birth}.
+        1. Si hay eventos históricos o culturales relevantes en esa ciudad en esa fecha, menciónalos de forma que resalten
+           la conexión especial entre la persona y su lugar de nacimiento.
+        2. Si no hay eventos específicos en la ciudad, enfócate en la singularidad de la persona y en el significado general
+           de la fecha en contextos más amplios (nacional o global), siempre resaltando la importancia de la persona.
+        3. Evita inventar eventos o mencionar cosas que no existan. Si no hay eventos, enfócate en el simbolismo de la fecha,
+           los astros o el impacto positivo de su nacimiento.
+        4. Escribe con un tono místico, empático y motivador, como si estuvieras escribiendo un mensaje único y lleno de sabiduría
+           para esa persona.
+        """
+
+        # Enviar la solicitud al servicio OpenAI
+        headers = {'X-API-Key': api_key}
+        response = requests.post(
+            OPENAI_SERVICE_URL,
+            json={
+                "prompt": prompt,
+                "max_tokens": 300,
+                "temperature": 0.5,
+                "model": "gpt-4"
+            },
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            report = response.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            
+            # Guardar en la base de datos
+            cursor.execute('INSERT OR IGNORE INTO news_cache (city, date, summary) VALUES (?, ?, ?)', (city_of_birth, date_of_birth, report))
+            conn.commit()
+            conn.close()
+            
+            logger.info(f"Nuevo resumen de noticias generado y guardado para {date_of_birth} en {city_of_birth}")
+            return jsonify({
+                "city_of_birth": city_of_birth,
+                "date_of_birth": date_of_birth,
+                "news_summary": report
+            }), 200
+        else:
+            logger.error(f"Error en servicio OpenAI: {response.status_code} - {response.text}")
+            conn.close()
+            return jsonify({"error": f"Error en el servicio OpenAI: {response.text}"}), response.status_code
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=False, host="0.0.0.0", port=5007)
+

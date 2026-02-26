@@ -1,0 +1,957 @@
+==== ./docker-compose.yml ====
+version: '3.8'
+
+services:
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    ports:
+      - "8050:5050"
+    environment:
+      - JWT_SECRET_KEY=astrofuturo_secret_key
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=astrofuturo2023
+      - ADMIN_KEY=astrofuturo_admin_key
+    volumes:
+      - auth_data:/app/data
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    ports:
+      - "9000:5000"  # Cambiado a 9000
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+      - MUSIC_SERVICE_URL=http://music_service:5002/music
+      - ASTRONOMY_SERVICE_URL=http://astronomy_service:5003/astronomy
+      - WEATHER_SERVICE_URL=http://weather_service:5004/weather
+      - ASTRO_REPORT_SERVICE_URL=http://astro_report_service:5006/astro_report
+      - NEWS_SERVICE_URL=http://news_service:5007/news
+      - PDF_SERVICE_URL=http://pdf_service:5008/generate_pdf
+      - COMPATIBILITY_SERVICE_URL=http://compatibility_service:5009/compatibility
+      - LOCATION_SERVICE_URL=http://location_service:5011/location
+      - EMAIL_SERVICE_URL=http://email_service:5012/email
+      - WHATSAPP_SERVICE_URL=http://whatsapp_service:5013/whatsapp
+      - PAYMENT_SERVICE_URL=http://payment_service:5014
+      - MOVIE_SERVICE_URL=http://movie_service:5000/api/movies
+      - ASTRO_CHART_SERVICE_URL=http://astro_chart_service:5015/astro_chart
+      - GEOGRAPHIC_SERVICE_URL=http://geographic_service:5025/geographic
+      - HOUSES_SERVICE_URL=http://houses_service:5030/houses
+      - GEMSTONES_SERVICE_URL=http://gemstones_service:5035/gemstones
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    depends_on:
+      - auth_service
+      - zodiac_service
+      - astro_report_service
+      - news_service
+      - compatibility_service
+      - location_service
+      - geographic_service
+      - houses_service
+      - gemstones_service
+      - openai_service
+      - astro_chart_service
+    restart: unless-stopped
+
+  zodiac_service:
+    build: ./zodiac_service
+    ports:
+      - "8001:5001"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - zodiac_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  astro_report_service:
+    build: ./astro_report_service
+    ports:
+      - "8006:5006"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - astro_report_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  news_service:
+    build: ./news_service
+    ports:
+      - "8007:5007"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - news_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  compatibility_service:
+    build: ./compatibility_service
+    ports:
+      - "8009:5009"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - compatibility_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  openai_service:
+    build: ./openai_service_mock
+    ports:
+      - "8010:5010"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - ./openai_service/.env:/app/.env
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  location_service:
+    build: ./location_service
+    ports:
+      - "8011:5011"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+    volumes:
+      - location_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+      - zodiac_service
+    restart: unless-stopped
+
+  geographic_service:
+    build: ./geographic_service
+    ports:
+      - "8025:5025"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - geographic_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  houses_service:
+    build: ./houses_service
+    ports:
+      - "8030:5030"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - houses_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  gemstones_service:
+    build: ./gemstones_service
+    ports:
+      - "8035:5035"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - gemstones_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  astro_chart_service:
+    build: ./astro_chart_service
+    ports:
+      - "8015:5015"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ASTRONOMY_SERVICE_URL=http://astronomy_service:5003/astronomy
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - astro_chart_data:/data
+    depends_on:
+      - auth_service
+      - zodiac_service
+      - openai_service
+    restart: unless-stopped
+
+  payment_service:
+    build: ./payment_service
+    ports:
+      - "8014:5014"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - ./payment_service/.env:/app/.env
+      - payment_data:/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+volumes:
+  auth_data:
+  zodiac_data:
+  astro_report_data:
+  news_data:
+  compatibility_data:
+  location_data:
+  geographic_data:
+  houses_data:
+  gemstones_data:
+  astro_chart_data:
+  payment_data:
+
+
+
+==== ./location_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /app/data
+VOLUME /app/data
+
+CMD ["python", "location_service.py"]
+
+
+
+
+==== ./location_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./compatibility_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /data
+VOLUME /data
+
+CMD ["python", "compatibility_service.py"]
+
+
+
+
+==== ./compatibility_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./zodiac_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /app/data
+VOLUME /app/data
+
+CMD ["python", "zodiac_service.py"]
+
+
+
+
+==== ./zodiac_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+werkzeug==2.0.1
+
+
+
+
+==== ./api_gateway/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "api_gateway.py"]
+
+
+
+
+==== ./api_gateway/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+werkzeug==2.0.1
+
+flask-cors==3.0.10
+
+
+
+==== ./news_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /app/data
+VOLUME /app/data
+
+CMD ["python", "news_service.py"]
+
+
+
+
+==== ./news_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./docker-compose.yml.bak ====
+version: '3.8'
+
+services:
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    ports:
+      - "8050:5050"
+    environment:
+      - JWT_SECRET_KEY=astrofuturo_secret_key
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=astrofuturo2023
+      - ADMIN_KEY=astrofuturo_admin_key
+    volumes:
+      - auth_data:/app/data
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    ports:
+      - "9000:5000"  # Cambiado a 9000
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+      - MUSIC_SERVICE_URL=http://music_service:5002/music
+      - ASTRONOMY_SERVICE_URL=http://astronomy_service:5003/astronomy
+      - WEATHER_SERVICE_URL=http://weather_service:5004/weather
+      - ASTRO_REPORT_SERVICE_URL=http://astro_report_service:5006/astro_report
+      - NEWS_SERVICE_URL=http://news_service:5007/news
+      - PDF_SERVICE_URL=http://pdf_service:5008/generate_pdf
+      - COMPATIBILITY_SERVICE_URL=http://compatibility_service:5009/compatibility
+      - LOCATION_SERVICE_URL=http://location_service:5011/location
+      - EMAIL_SERVICE_URL=http://email_service:5012/email
+      - WHATSAPP_SERVICE_URL=http://whatsapp_service:5013/whatsapp
+      - PAYMENT_SERVICE_URL=http://payment_service:5014
+      - MOVIE_SERVICE_URL=http://movie_service:5000/api/movies
+      - ASTRO_CHART_SERVICE_URL=http://astro_chart_service:5015/astro_chart
+      - GEOGRAPHIC_SERVICE_URL=http://geographic_service:5025/geographic
+      - HOUSES_SERVICE_URL=http://houses_service:5030/houses
+      - GEMSTONES_SERVICE_URL=http://gemstones_service:5035/gemstones
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    depends_on:
+      - auth_service
+      - zodiac_service
+      - astro_report_service
+      - news_service
+      - compatibility_service
+      - location_service
+      - geographic_service
+      - houses_service
+      - gemstones_service
+      - openai_service
+      - astro_chart_service
+    restart: unless-stopped
+
+  zodiac_service:
+    build: ./zodiac_service
+    ports:
+      - "8001:5001"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - zodiac_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  astro_report_service:
+    build: ./astro_report_service
+    ports:
+      - "8006:5006"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - astro_report_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  news_service:
+    build: ./news_service
+    ports:
+      - "8007:5007"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - news_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  compatibility_service:
+    build: ./compatibility_service
+    ports:
+      - "8009:5009"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - compatibility_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  openai_service:
+    build: ./openai_service
+    ports:
+      - "8010:5010"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - ./openai_service/.env:/app/.env
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  location_service:
+    build: ./location_service
+    ports:
+      - "8011:5011"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+    volumes:
+      - location_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+      - zodiac_service
+    restart: unless-stopped
+
+  geographic_service:
+    build: ./geographic_service
+    ports:
+      - "8025:5025"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - geographic_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  houses_service:
+    build: ./houses_service
+    ports:
+      - "8030:5030"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - houses_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  gemstones_service:
+    build: ./gemstones_service
+    ports:
+      - "8035:5035"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - gemstones_data:/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  astro_chart_service:
+    build: ./astro_chart_service
+    ports:
+      - "8015:5015"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ASTRONOMY_SERVICE_URL=http://astronomy_service:5003/astronomy
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+      - OPENAI_SERVICE_URL=http://openai_service:5010/generate
+    volumes:
+      - astro_chart_data:/data
+    depends_on:
+      - auth_service
+      - zodiac_service
+      - openai_service
+    restart: unless-stopped
+
+  payment_service:
+    build: ./payment_service
+    ports:
+      - "8014:5014"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - ./payment_service/.env:/app/.env
+      - payment_data:/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+volumes:
+  auth_data:
+  zodiac_data:
+  astro_report_data:
+  news_data:
+  compatibility_data:
+  location_data:
+  geographic_data:
+  houses_data:
+  gemstones_data:
+  astro_chart_data:
+  payment_data:
+
+
+
+==== ./direct_gemstones_endpoint.py ====
+"""
+Script para añadir un endpoint directo para el servicio de gemas
+"""
+
+import os
+import sys
+import re
+
+def add_direct_gemstones_endpoint():
+    """Añade un endpoint directo para el servicio de gemas"""
+    api_gateway_path = "api_gateway/api_gateway.py"
+    
+    # Verificar si el archivo existe
+    if not os.path.exists(api_gateway_path):
+        print(f"Error: No se encontró el archivo {api_gateway_path}")
+        return False
+    
+    # Crear una copia de seguridad
+    backup_path = f"{api_gateway_path}.bak.{os.getpid()}"
+    try:
+        with open(api_gateway_path, 'r') as src, open(backup_path, 'w') as dst:
+            dst.write(src.read())
+        print(f"Copia de seguridad creada en {backup_path}")
+    except Exception as e:
+        print(f"Error al crear copia de seguridad: {str(e)}")
+        return False
+    
+    # Nuevo endpoint a añadir
+    new_endpoint = """
+# Endpoint directo para el servicio de gemas sin verificación de permisos
+@app.route('/api/direct_gemstones', methods=['POST'])
+def direct_gemstones_service():
+    """Endpoint directo para el servicio de gemas sin verificación de permisos"""
+    data = request.json
+    # Forzar el uso de datos simulados
+    data["mock"] = True
+    url = f"{GEMSTONES_SERVICE}/gemstones"
+    logger.info(f"Enviando solicitud directa a: {url}")
+    try:
+        # No enviamos la API key, ya que no es necesaria para los datos simulados
+        response = requests.post(url, json=data)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        else:
+            logger.error(f"Error del servicio de gemas: {response.status_code} - {response.text}")
+            return jsonify({"error": response.text}), response.status_code
+    except Exception as e:
+        logger.error(f"Error al conectar con el servicio de gemas: {str(e)}")
+        return jsonify({"error": f"Error de conexión: {str(e)}"}), 500
+"""
+    
+    # Leer el contenido del archivo
+    with open(api_gateway_path, 'r') as f:
+        content = f.read()
+    
+    # Verificar si el endpoint ya existe
+    if "def direct_gemstones_service" in content:
+        print("El endpoint directo ya existe en el archivo")
+        return True
+    
+    # Encontrar el punto de inserción (antes de if __name__ == '__main__':)
+    match = re.search(r"if\s+__name__\s*==\s*['\"]__main__['\"]:", content)
+    if not match:
+        print("No se pudo encontrar el punto de inserción en el archivo")
+        return False
+    
+    # Insertar el nuevo endpoint
+    insert_pos = match.start()
+    new_content = content[:insert_pos] + new_endpoint + content[insert_pos:]
+    
+    # Escribir el contenido modificado
+    try:
+        with open(api_gateway_path, 'w') as f:
+            f.write(new_content)
+        print("Endpoint directo añadido correctamente")
+        return True
+    except Exception as e:
+        print(f"Error al escribir el archivo: {str(e)}")
+        # Restaurar la copia de seguridad
+        try:
+            with open(backup_path, 'r') as src, open(api_gateway_path, 'w') as dst:
+                dst.write(src.read())
+            print("Se ha restaurado la copia de seguridad")
+        except Exception as e2:
+            print(f"Error al restaurar la copia de seguridad: {str(e2)}")
+        return False
+
+if __name__ == "__main__":
+    print("=== AÑADIENDO ENDPOINT DIRECTO PARA EL SERVICIO DE GEMAS ===\n")
+    if add_direct_gemstones_endpoint():
+        print("\n¡Endpoint añadido con éxito!")
+        print("Reinicia el API Gateway con: docker-compose restart api_gateway")
+        print("Prueba el endpoint con: curl -X POST \"https://api.todoastros.com/api/direct_gemstones\" -H \"Content-Type: application/json\" -d '{\"sign\":\"Aries\",\"name\":\"Tu Nombre\",\"birth_date\":\"1990-01-01\"}'")
+    else:
+        print("\nLa operación falló. Verifica los mensajes de error.")
+
+
+
+
+==== ./astro_chart_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /data
+VOLUME /data
+
+CMD ["python", "astro_chart_service.py"]
+
+
+
+
+==== ./astro_chart_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./openai_service_mock/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 5010
+
+CMD ["python", "openai_service.py"]
+
+
+
+==== ./openai_service_mock/requirements.txt ====
+flask==2.0.1
+flask-cors==3.0.10
+
+
+
+==== ./auth_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /app/data
+VOLUME /app/data
+
+CMD ["python", "auth_service.py"]
+
+
+
+
+==== ./auth_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+pyjwt==2.1.0
+werkzeug==2.0.1
+
+
+
+
+==== ./gemstones_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /data
+VOLUME /data
+
+CMD ["python", "gemstones_service.py"]
+
+
+
+
+==== ./gemstones_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./houses_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /data
+VOLUME /data
+
+CMD ["python", "houses_service.py"]
+
+
+
+
+==== ./houses_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./astro_report_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /app/data
+VOLUME /app/data
+
+CMD ["python", "astro_report_service.py"]
+
+
+
+
+==== ./astro_report_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./geographic_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /data
+VOLUME /data
+
+CMD ["python", "geographic_service.py"]
+
+
+
+
+==== ./geographic_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+
+
+
+
+==== ./payment_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Crear directorio para datos persistentes
+RUN mkdir -p /data
+VOLUME /data
+
+CMD ["python", "payment_service.py"]
+
+
+
+==== ./payment_service/requirements.txt ====
+flask==2.0.1
+requests==2.26.0
+flask-cors==3.0.10
+werkzeug==2.0.1
+stripe==2.65.0
+python-dotenv==0.19.0
+
+
+
+==== ./openai_service_new/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY openai_service.py .
+
+CMD ["python", "openai_service.py"]
+
+
+
+==== ./openai_service_new/requirements.txt ====
+flask==2.0.1
+flask-cors==3.0.10
+requests==2.26.0
+werkzeug==2.0.1
+
+
+
+==== ./openai_service/Dockerfile ====
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY openai_service_fixed.py openai_service.py
+COPY .env .
+
+CMD ["python", "openai_service.py"]
+
+
+
+==== ./openai_service/requirements.txt ====
+flask==2.0.1
+flask-cors==3.0.10
+requests==2.26.0
+python-dotenv==0.19.0
+openai==1.3.0
+werkzeug==2.0.1
+
+
+
+

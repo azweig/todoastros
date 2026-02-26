@@ -1,0 +1,106 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from base_service import create_service
+from datetime import datetime
+
+app, run = create_service("Music", 5002)
+
+class MusicRequest(BaseModel):
+    date_of_birth: str
+
+# Base de datos simulada de canciones populares por década
+popular_songs_by_decade = {
+    "1960s": [
+        {"rank": 1, "song": "I Want to Hold Your Hand", "artist": "The Beatles", "date": "1964-01-01"},
+        {"rank": 2, "song": "(I Can't Get No) Satisfaction", "artist": "The Rolling Stones", "date": "1965-06-01"},
+        {"rank": 3, "song": "Good Vibrations", "artist": "The Beach Boys", "date": "1966-10-01"},
+        {"rank": 4, "song": "Respect", "artist": "Aretha Franklin", "date": "1967-04-01"},
+        {"rank": 5, "song": "Hey Jude", "artist": "The Beatles", "date": "1968-08-01"},
+    ],
+    "1970s": [
+        {"rank": 1, "song": "Stairway to Heaven", "artist": "Led Zeppelin", "date": "1971-11-01"},
+        {"rank": 2, "song": "Bohemian Rhapsody", "artist": "Queen", "date": "1975-10-01"},
+        {"rank": 3, "song": "Hotel California", "artist": "Eagles", "date": "1977-02-01"},
+        {"rank": 4, "song": "Stayin' Alive", "artist": "Bee Gees", "date": "1977-12-01"},
+        {"rank": 5, "song": "Imagine", "artist": "John Lennon", "date": "1971-10-01"},
+    ],
+    "1980s": [
+        {"rank": 1, "song": "Billie Jean", "artist": "Michael Jackson", "date": "1983-01-01"},
+        {"rank": 2, "song": "Sweet Child O' Mine", "artist": "Guns N' Roses", "date": "1988-08-01"},
+        {"rank": 3, "song": "Like a Prayer", "artist": "Madonna", "date": "1989-03-01"},
+        {"rank": 4, "song": "Every Breath You Take", "artist": "The Police", "date": "1983-05-01"},
+        {"rank": 5, "song": "With or Without You", "artist": "U2", "date": "1987-03-01"},
+    ],
+    "1990s": [
+        {"rank": 1, "song": "Smells Like Teen Spirit", "artist": "Nirvana", "date": "1991-09-01"},
+        {"rank": 2, "song": "Wonderwall", "artist": "Oasis", "date": "1995-10-01"},
+        {"rank": 3, "song": "...Baby One More Time", "artist": "Britney Spears", "date": "1998-10-01"},
+        {"rank": 4, "song": "Nothing Compares 2 U", "artist": "Sinéad O'Connor", "date": "1990-01-01"},
+        {"rank": 5, "song": "Vogue", "artist": "Madonna", "date": "1990-03-01"},
+    ],
+    "2000s": [
+        {"rank": 1, "song": "Crazy In Love", "artist": "Beyoncé ft. Jay-Z", "date": "2003-05-01"},
+        {"rank": 2, "song": "Hey Ya!", "artist": "OutKast", "date": "2003-09-01"},
+        {"rank": 3, "song": "Umbrella", "artist": "Rihanna ft. Jay-Z", "date": "2007-03-01"},
+        {"rank": 4, "song": "Toxic", "artist": "Britney Spears", "date": "2004-01-01"},
+        {"rank": 5, "song": "Rolling in the Deep", "artist": "Adele", "date": "2010-11-01"},
+    ],
+    "2010s": [
+        {"rank": 1, "song": "Uptown Funk", "artist": "Mark Ronson ft. Bruno Mars", "date": "2014-11-01"},
+        {"rank": 2, "song": "Shape of You", "artist": "Ed Sheeran", "date": "2017-01-01"},
+        {"rank": 3, "song": "Despacito", "artist": "Luis Fonsi ft. Daddy Yankee", "date": "2017-01-01"},
+        {"rank": 4, "song": "Bad Guy", "artist": "Billie Eilish", "date": "2019-03-01"},
+        {"rank": 5, "song": "Old Town Road", "artist": "Lil Nas X ft. Billy Ray Cyrus", "date": "2019-04-01"},
+    ],
+    "2020s": [
+        {"rank": 1, "song": "Blinding Lights", "artist": "The Weeknd", "date": "2020-01-01"},
+        {"rank": 2, "song": "Levitating", "artist": "Dua Lipa", "date": "2020-10-01"},
+        {"rank": 3, "song": "Drivers License", "artist": "Olivia Rodrigo", "date": "2021-01-01"},
+        {"rank": 4, "song": "As It Was", "artist": "Harry Styles", "date": "2022-04-01"},
+        {"rank": 5, "song": "Flowers", "artist": "Miley Cyrus", "date": "2023-01-01"},
+    ],
+}
+
+@app.post("/music")
+async def get_music(request: MusicRequest):
+    try:
+        # Convertir la fecha de nacimiento a objeto datetime
+        birth_date = datetime.strptime(request.date_of_birth, "%Y-%m-%d")
+        year = birth_date.year
+        
+        # Determinar la década
+        decade = None
+        if year < 1970:
+            decade = "1960s"
+        elif year < 1980:
+            decade = "1970s"
+        elif year < 1990:
+            decade = "1980s"
+        elif year < 2000:
+            decade = "1990s"
+        elif year < 2010:
+            decade = "2000s"
+        elif year < 2020:
+            decade = "2010s"
+        else:
+            decade = "2020s"
+        
+        # Obtener canciones de la década correspondiente
+        songs = popular_songs_by_decade[decade]
+        
+        # Ajustar las fechas para que sean cercanas a la fecha de nacimiento
+        adjusted_songs = []
+        for song in songs:
+            adjusted_song = song.copy()
+            adjusted_song["date"] = request.date_of_birth
+            adjusted_songs.append(adjusted_song)
+        
+        return {
+            "top_songs": adjusted_songs
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    run()
+
