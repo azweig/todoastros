@@ -1,0 +1,325 @@
+version: '3.8'
+
+services:
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile.fixed
+    ports:
+      - "5050:5050"
+    environment:
+      - JWT_SECRET_KEY=astrofuturo_secret_key
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=astrofuturo2023
+      - ADMIN_KEY=astrofuturo_admin_key
+    volumes:
+      - auth_data:/app/data
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile.fixed
+    ports:
+      - "6000:5000"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+      - MUSIC_SERVICE_URL=http://music_service:5002/music
+      - ASTRONOMY_SERVICE_URL=http://astronomy_service:5003/astronomy
+      - WEATHER_SERVICE_URL=http://weather_service:5004/weather
+      - ASTRO_REPORT_SERVICE_URL=http://astro_report_service:5006/astro_report
+      - NEWS_SERVICE_URL=http://news_service:5007/news
+      - PDF_SERVICE_URL=http://pdf_service:5008/generate_pdf
+      - COMPATIBILITY_SERVICE_URL=http://compatibility_service:5009/compatibility
+      - LOCATION_SERVICE_URL=http://location_service:5011/location
+      - EMAIL_SERVICE_URL=http://email_service:5012/email
+      - WHATSAPP_SERVICE_URL=http://whatsapp_service:5013/whatsapp
+      - PAYMENT_SERVICE_URL=http://payment_service:5014/payment
+    depends_on:
+      - auth_service
+      - zodiac_service
+      - music_service
+      - astronomy_service
+      - weather_service
+      - astro_report_service
+      - news_service
+      - pdf_service
+      - compatibility_service
+      - location_service
+      - email_service
+      - whatsapp_service
+      - payment_service
+    restart: unless-stopped
+
+  zodiac_service:
+    build: ./zodiac_service
+    ports:
+      - "6001:5001"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - zodiac_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  music_service:
+    build:
+      context: ./music_service
+      dockerfile: Dockerfile.fixed
+    ports:
+      - "6002:5002"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - music_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  astronomy_service:
+    build: ./astronomy_service
+    ports:
+      - "6003:5003"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ASTRO_DB_PATH=/data/astronomical_data.db
+    volumes:
+      - astronomical_data:/data  # Cambiado de backend_astronomical_data a astronomical_data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  weather_service:
+    build: ./weather_service
+    ports:
+      - "6004:5004"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - weather_data:/app/data
+    depends_on:
+      - auth_service
+      - astronomy_service
+    restart: unless-stopped
+
+  astro_report_service:
+    build: ./astro_report_service
+    ports:
+      - "6006:5006"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/openai
+    volumes:
+      - astro_report_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  news_service:
+    build: ./news_service
+    ports:
+      - "6007:5007"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/openai
+    volumes:
+      - news_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+    restart: unless-stopped
+
+  pdf_service:
+    build: ./pdf_service
+    ports:
+      - "6008:5008"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - pdf_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  openai_service:
+    build: ./openai_service
+    ports:
+      - "6012:5010"  # Changed from 6010:5010 to 6012:5010
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - ./openai_service/.env:/app/.env
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  location_service:
+    build: ./location_service
+    ports:
+      - "5011:5011"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/openai
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+    volumes:
+      - location_data:/app/data
+    depends_on:
+      - auth_service
+      - openai_service
+      - zodiac_service
+    restart: unless-stopped
+
+  email_service:
+    build: ./email_service
+    ports:
+      - "5012:5012"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_FROM=Astrofuturo <noreply@astrofuturo.com>
+    volumes:
+      - email_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  whatsapp_service:
+    build: ./whatsapp_service
+    ports:
+      - "5013:5013"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - WHATSAPP_API_URL=${WHATSAPP_API_URL}
+      - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN}
+    volumes:
+      - whatsapp_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  payment_service:
+    build: ./payment_service
+    ports:
+      - "5014:5014"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - PAYMENT_SECRET_KEY=${PAYMENT_SECRET_KEY}
+    volumes:
+      - payment_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  movie_service:
+    build: ./movie_service
+    ports:
+      - "6015:5000"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+    volumes:
+      - movie_data:/app/data
+    depends_on:
+      - auth_service
+    restart: unless-stopped
+
+  astro_chart_service:  # This needs to be indented at the same level as other services
+    build: ./astro_chart_service
+    ports:
+      - "6016:5015"  # Change from 6015 to 6016
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - ASTRONOMY_SERVICE_URL=http://astronomy_service:5003/astronomy
+      - ZODIAC_SERVICE_URL=http://zodiac_service:5001/zodiac
+      - OPENAI_SERVICE_URL=http://openai_service:5010/openai
+    volumes:
+      - astro_chart_data:/data
+    depends_on:
+      - auth_service
+      - astronomy_service
+      - zodiac_service
+      - openai_service
+    restart: unless-stopped
+
+  compatibility_service:
+    build: ./compatibility_service
+    ports:
+      - "6020:5020"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://openai_service:5010/openai
+    volumes:
+      - compatibility_data:/data
+    depends_on:
+      - auth_service
+      - openai_service  # Depend on existing openai_service
+    restart: unless-stopped
+
+  geographic_service:
+    build: ./geographic_service
+    ports:
+      - "6025:5025"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://172.18.0.16:5010/generate
+    volumes:
+      - geographic_data:/data
+    depends_on:
+      - auth_service
+      - openai_service  # Depend on existing openai_service
+    restart: unless-stopped
+
+  houses_service:
+    build: ./houses_service
+    ports:
+      - "6030:5030"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://172.18.0.16:5010/generate
+    volumes:
+      - houses_data:/data
+    depends_on:
+      - auth_service
+      - openai_service  # Depend on existing openai_service
+    restart: unless-stopped
+
+  gemstones_service:
+    build: ./gemstones_service
+    ports:
+      - "6035:5035"
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:5050
+      - OPENAI_SERVICE_URL=http://172.18.0.16:5010/generate
+    volumes:
+      - gemstones_data:/data
+    depends_on:
+      - auth_service
+      - openai_service  # Depend on existing openai_service
+    restart: unless-stopped
+
+volumes:
+  auth_data:
+  zodiac_data:
+  music_data:
+  movie_data:
+  astronomy_data:
+  astronomical_data:
+  weather_data:
+  astro_report_data:
+  news_data:
+  pdf_data:
+  openai_data:
+  compatibility_data:
+  location_data:
+  email_data:
+  whatsapp_data:
+  astro_chart_data:
+  payment_data:
+  geographic_data:
+  houses_data:
+  gemstones_data:

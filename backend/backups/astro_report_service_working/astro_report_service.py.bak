@@ -1,0 +1,141 @@
+from flask import Flask, request, jsonify
+import requests
+import logging
+import os
+import sqlite3
+import json
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("astro_report_service.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("astro_report_service")
+
+app = Flask(__name__)
+
+# URL del servicio de autenticación
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://localhost:5050")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://localhost:5010/openai")
+
+def verify_api_key(api_key):
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/auth/verify",
+            json={"api_key": api_key}
+        )
+        return response.status_code == 200 and response.json().get("valid", False)
+    except Exception as e:
+        logger.error(f"Error al verificar API key: {str(e)}")
+        return False
+
+def init_db():
+    conn = sqlite3.connect('astro_reports.db')
+    cursor = conn.cursor()
+    
+    # Tabla para caché de informes
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS report_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        date_of_birth TEXT NOT NULL,
+        time_of_birth TEXT NOT NULL,
+        city_of_birth TEXT NOT NULL,
+        report TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(name, date_of_birth, time_of_birth, city_of_birth)
+    )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "up"}), 200
+
+@app.route('/astro_report', methods=['POST'])
+def astro_report():
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+    
+    data = request.get_json()
+    name = data.get('name')
+    date_of_birth = data.get('date_of_birth')
+    time_of_birth = data.get("time_of_birth", "12:00 PM")
+    city_of_birth = data.get('city_of_birth')
+
+    if not all([name, date_of_birth, time_of_birth, city_of_birth]):
+        logger.warning("Solicitud sin datos obligatorios")
+        return jsonify({"error": "Faltan datos obligatorios"}), 400
+
+    try:
+        # Verificar caché
+        conn = sqlite3.connect('astro_reports.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT report FROM report_cache WHERE name = ? AND date_of_birth = ? AND time_of_birth = ? AND city_of_birth = ?",
+            (name, date_of_birth, time_of_birth, city_of_birth)
+        )
+        cached = cursor.fetchone()
+        
+        if cached:
+            logger.info(f"Informe astral recuperado de caché para {name}")
+            conn.close()
+            return jsonify({"name": name, "report": cached[0]}), 200
+
+        # Crear el prompt
+        prompt = f"""
+        Genera un informe astrológico detallado para:
+        Nombre: {name}
+        Fecha de nacimiento: {date_of_birth}
+        Hora de nacimiento: {time_of_birth}
+        Ciudad de nacimiento: {city_of_birth}
+        Incluye aspectos espirituales, psicológicos y prácticos, con un tono reflexivo.
+        """
+
+        # Enviar la solicitud al servicio OpenAI
+        headers = {'X-API-Key': api_key}
+        response = requests.post(
+            OPENAI_SERVICE_URL,
+            json={
+                "prompt": prompt,
+                "max_tokens": 1500,
+                "temperature": 0.5,
+                "model": "gpt-4"
+            },
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            # Guardar en caché
+            cursor.execute(
+                "INSERT OR REPLACE INTO report_cache (name, date_of_birth, time_of_birth, city_of_birth, report) VALUES (?, ?, ?, ?, ?)",
+                (name, date_of_birth, time_of_birth, city_of_birth, content.strip())
+            )
+            conn.commit()
+            conn.close()
+            
+            logger.info(f"Nuevo informe astral generado y guardado para {name}")
+            return jsonify({"name": name, "report": content.strip()}), 200
+        else:
+            logger.error(f"Error en servicio OpenAI: {response.status_code} - {response.text}")
+            conn.close()
+            return jsonify({"error": f"Error en el servicio OpenAI: {response.text}"}), response.status_code
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=False, host="0.0.0.0", port=5006)
+

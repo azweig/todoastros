@@ -1,0 +1,87 @@
+INFO:     Started server process [2547486]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
+INFO:     198.235.24.110:64486 - "GET / HTTP/1.1" 200 OK
+INFO:     112.72.237.52:63166 - "GET / HTTP/1.0" 200 OK
+INFO:     13.52.240.67:38948 - "GET / HTTP/1.1" 200 OK
+INFO:     198.235.24.247:55659 - "GET / HTTP/1.0" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     162.142.125.195:54104 - "GET / HTTP/1.1" 200 OK
+INFO:     162.142.125.195:37784 - "GET / HTTP/1.1" 200 OK
+INFO:     162.142.125.195:37792 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     162.142.125.195:41650 - "PRI %2A HTTP/2.0" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     162.142.125.195:41672 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     64.62.197.147:13287 - "GET / HTTP/1.1" 200 OK
+INFO:     64.62.197.147:45217 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     165.22.239.203:60202 - "GET / HTTP/1.1" 200 OK
+INFO:     167.99.82.175:53830 - "GET / HTTP/1.1" 200 OK
+INFO:     167.99.82.175:53844 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.154.151:46510 - "GET / HTTP/1.1" 200 OK
+INFO:     199.45.154.151:39472 - "GET / HTTP/1.1" 200 OK
+INFO:     199.45.154.151:39488 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     199.45.154.151:39496 - "PRI %2A HTTP/2.0" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.154.151:46184 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     147.185.132.180:60784 - "GET / HTTP/1.1" 200 OK
+INFO:     147.185.132.31:51748 - "GET / HTTP/1.0" 200 OK
+INFO:     154.212.141.152:54980 - "GET / HTTP/1.1" 200 OK
+INFO:     118.26.37.95:56386 - "GET / HTTP/1.1" 200 OK
+INFO:     118.26.37.95:56390 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     194.164.107.6:59018 - "GET / HTTP/1.1" 200 OK
+INFO:     194.164.107.6:39312 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     20.65.195.18:54160 - "GET /v2/ HTTP/1.1" 404 Not Found
+INFO:     112.112.212.116:46079 - "GET / HTTP/1.1" 200 OK
+INFO:     60.13.7.171:30011 - "GET / HTTP/1.1" 200 OK
+INFO:     125.82.242.197:64905 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     36.112.213.23:54286 - "HEAD / HTTP/1.1" 405 Method Not Allowed
+INFO:     36.112.213.23:54360 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     1.11.225.36:61235 - "GET / HTTP/1.0" 200 OK
+INFO:     1.11.225.36:61255 - "GET / HTTP/1.0" 200 OK
+INFO:     184.105.247.252:17668 - "GET / HTTP/1.1" 200 OK
+INFO:     184.105.247.252:54438 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     195.178.110.38:35552 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     146.190.134.221:54086 - "GET / HTTP/1.1" 200 OK
+INFO:     97.88.248.249:60102 - "GET / HTTP/1.0" 200 OK
+INFO:     205.210.31.240:56864 - "GET / HTTP/1.0" 200 OK
+INFO:     204.76.203.18:0 - "GET /s/mips HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /s/mips HTTP/1.0" 404 Not Found
+INFO:     85.140.70.141:0 - "GET / HTTP/1.0" 200 OK
+INFO:     204.76.203.18:0 - "GET /Mozi.a HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /Mozi.a HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /arm4 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /arm4 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nshksh4 HTTP/1.0" 404 Not Found
+INFO:     205.210.31.41:65158 - "GET / HTTP/1.1" 200 OK
+INFO:     204.76.203.18:0 - "GET /nshsh4 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nshsh4 HTTP/1.0" 404 Not Found
+INFO:     45.63.77.222:0 - "GET /api/health HTTP/1.0" 404 Not Found
+INFO:     45.63.77.222:0 - "GET /api/health HTTP/1.0" 404 Not Found
+INFO:     45.63.77.222:0 - "POST /auth/login HTTP/1.0" 404 Not Found
+INFO:     35.171.159.47:0 - "HEAD /api/health HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nshmpsl HTTP/1.0" 404 Not Found
+INFO:     127.0.0.1:34056 - "GET /api/health HTTP/1.1" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /hmips HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nshkx86 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm HTTP/1.0" 404 Not Found
+INFO:     127.0.0.1:34848 - "GET /api/health HTTP/1.1" 404 Not Found
+INFO:     45.63.77.222:0 - "GET /api/health HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm6 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm6 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm6 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm7 HTTP/1.0" 404 Not Found
+INFO:     204.76.203.18:0 - "GET /nsharm7 HTTP/1.0" 404 Not Found

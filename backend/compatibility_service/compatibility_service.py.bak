@@ -1,0 +1,163 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
+import requests
+import os
+import json
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("compatibility_service.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("compatibility_service")
+
+app = Flask(__name__)
+CORS(app)
+
+# URLs de los servicios
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth_service:5050")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://openai_service:5010")
+
+def verify_api_key(api_key):
+    """Verifica la validez de la API key con el servicio de autenticación."""
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/auth/verify",
+            json={"api_key": api_key}
+        )
+        return response.status_code == 200 and response.json().get("valid", False)
+    except Exception as e:
+        logger.error(f"Error al verificar API key: {str(e)}")
+        return False
+
+def generate_compatibility_analysis(data, api_key):
+    """Genera un análisis de compatibilidad utilizando OpenAI."""
+    try:
+        sign1 = data.get('sign1', '')
+        sign2 = data.get('sign2', '')
+        
+        prompt = f"""Genera un análisis detallado de compatibilidad entre {sign1} y {sign2}, basado en las enseñanzas de astrólogos reconocidos como Linda Goodman, Liz Greene y Stephen Arroyo.
+
+El análisis debe incluir:
+
+1. Compatibilidad general (porcentaje y explicación)
+2. Compatibilidad romántica y sexual (porcentaje y explicación)
+3. Compatibilidad en comunicación (porcentaje y explicación)
+4. Compatibilidad en confianza y valores (porcentaje y explicación)
+5. Compatibilidad emocional (porcentaje y explicación)
+6. Fortalezas de la relación
+7. Desafíos de la relación
+8. Consejos para mejorar la relación
+
+Utiliza un lenguaje accesible pero profundo, que combine conocimientos astrológicos tradicionales con psicología moderna. Incluye referencias a los elementos (fuego, tierra, aire, agua), modalidades (cardinal, fijo, mutable), y aspectos planetarios relevantes entre los regentes de ambos signos.
+
+Proporciona un análisis equilibrado que reconozca tanto las sinergias como las tensiones entre estos signos, ofreciendo una visión realista pero optimista de cómo pueden complementarse y crecer juntos.
+"""
+
+        logger.info(f"Enviando solicitud a OpenAI para análisis de compatibilidad")
+
+        # Enviar solicitud a OpenAI
+        full_url = f"{OPENAI_SERVICE_URL}/generate"
+        logger.info(f"URL completa: {full_url}")
+
+        response = requests.post(
+            full_url,
+            json={
+                "prompt": prompt,
+                "max_tokens": 2000,
+                "temperature": 0.7
+            },
+            headers={"X-API-Key": api_key}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Error al generar análisis de compatibilidad: {response.text}")
+            return None
+
+        result = response.json()
+        logger.info(f"Texto generado: {len(result.get('text', ''))} caracteres")
+
+        return result.get("text")
+    except Exception as e:
+        logger.error(f"Error al generar análisis de compatibilidad: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Endpoint para verificar la salud del servicio."""
+    return jsonify({"status": "up"}), 200
+
+@app.route('/compatibility', methods=['POST'])
+def compatibility():
+    """Endpoint para generar un análisis de compatibilidad."""
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+
+    # Obtener datos de la solicitud
+    data = request.get_json()
+    sign1 = data.get('sign1', '')
+    sign2 = data.get('sign2', '')
+
+    # Validar datos requeridos
+    if not all([sign1, sign2]):
+        logger.warning("Solicitud con datos incompletos")
+        return jsonify({"error": "Faltan datos obligatorios (signos zodiacales)"}), 400
+
+    try:
+        # Preparar datos para el análisis de compatibilidad
+        compatibility_data = {
+            'sign1': sign1,
+            'sign2': sign2
+        }
+
+        # Generar el análisis de compatibilidad
+        compatibility_text = generate_compatibility_analysis(compatibility_data, api_key)
+        if not compatibility_text:
+            return jsonify({"error": "No se pudo generar el análisis de compatibilidad"}), 500
+
+        # Calcular porcentajes de compatibilidad (simulados para este ejemplo)
+        # En una implementación real, estos valores se calcularían basados en algoritmos astrológicos
+        import random
+        overall = random.randint(60, 95)
+        romance = random.randint(max(overall-10, 60), min(overall+10, 95))
+        communication = random.randint(max(overall-10, 60), min(overall+10, 95))
+        trust = random.randint(max(overall-10, 60), min(overall+10, 95))
+        emotional = random.randint(max(overall-10, 60), min(overall+10, 95))
+        values = random.randint(max(overall-10, 60), min(overall+10, 95))
+
+        # Preparar respuesta
+        response = {
+            "compatibility_analysis": compatibility_text,
+            "compatibility_scores": {
+                "overall": overall,
+                "romance": romance,
+                "communication": communication,
+                "trust": trust,
+                "emotional_connection": emotional,
+                "values": values
+            },
+            "data": {
+                "sign1": sign1,
+                "sign2": sign2
+            }
+        }
+
+        logger.info(f"Análisis de compatibilidad generado exitosamente para {sign1} y {sign2}")
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud de análisis de compatibilidad: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=5020)

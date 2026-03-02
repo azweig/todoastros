@@ -1,0 +1,163 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
+import requests
+import os
+import json
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("geographic_service.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("geographic_service")
+
+app = Flask(__name__)
+CORS(app)
+
+# URLs de los servicios
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth_service:5050")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://openai_service:5010")
+
+def verify_api_key(api_key):
+    """Verifica la validez de la API key con el servicio de autenticación."""
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/auth/verify",
+            json={"api_key": api_key}
+        )
+        return response.status_code == 200 and response.json().get("valid", False)
+    except Exception as e:
+        logger.error(f"Error al verificar API key: {str(e)}")
+        return False
+
+def generate_geographic_analysis(data, api_key):
+    """Genera un análisis de compatibilidad geográfica utilizando OpenAI."""
+    try:
+        sun_sign = data.get('sun_sign', '')
+        moon_sign = data.get('moon_sign', '')
+        ascendant = data.get('ascendant', '')
+        
+        prompt = f"""Genera un análisis detallado de los mejores países y ciudades para vivir para una persona con Sol en {sun_sign}, Luna en {moon_sign} y Ascendente en {ascendant}, basado en los principios de astrología locacional y astrocartografía desarrollados por expertos como Jim Lewis, Arielle Guttman y Martin Davis.
+
+El análisis debe incluir:
+
+1. Los 5 mejores países para esta combinación astrológica, con porcentaje de compatibilidad y una breve explicación de por qué resuenan con esta energía.
+2. Las 5 mejores ciudades dentro del país más compatible, con porcentaje de compatibilidad y descripción de cómo la energía de la ciudad se alinea con el perfil astrológico.
+3. Explicación de cómo las líneas planetarias (especialmente de los planetas regentes del Sol, Luna y Ascendente) influyen en estas recomendaciones.
+4. Consideraciones sobre cómo los elementos dominantes en la carta (fuego, tierra, aire, agua) se relacionan con los climas y geografías recomendados.
+
+Utiliza un enfoque que combine la astrología tradicional con consideraciones prácticas modernas, como cultura, estilo de vida y oportunidades que resonarían con esta combinación astrológica particular.
+"""
+
+        logger.info(f"Enviando solicitud a OpenAI para análisis geográfico")
+
+        # Enviar solicitud a OpenAI
+        full_url = f"{OPENAI_SERVICE_URL}/generate"
+        logger.info(f"URL completa: {full_url}")
+
+        response = requests.post(
+            full_url,
+            json={
+                "prompt": prompt,
+                "max_tokens": 2000,
+                "temperature": 0.7
+            },
+            headers={"X-API-Key": api_key}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Error al generar análisis geográfico: {response.text}")
+            return None
+
+        result = response.json()
+        logger.info(f"Texto generado: {len(result.get('text', ''))} caracteres")
+
+        return result.get("text")
+    except Exception as e:
+        logger.error(f"Error al generar análisis geográfico: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Endpoint para verificar la salud del servicio."""
+    return jsonify({"status": "up"}), 200
+
+@app.route('/geographic', methods=['POST'])
+def geographic():
+    """Endpoint para generar un análisis de compatibilidad geográfica."""
+    # Verificar API key
+    api_key = request.headers.get('X-API-Key')
+    if not api_key or not verify_api_key(api_key):
+        logger.warning(f"Intento de acceso con API key inválida: {api_key}")
+        return jsonify({"error": "API key inválida o faltante"}), 401
+
+    # Obtener datos de la solicitud
+    data = request.get_json()
+    sun_sign = data.get('sun_sign', '')
+    moon_sign = data.get('moon_sign', '')
+    ascendant = data.get('ascendant', '')
+
+    # Validar datos requeridos
+    if not sun_sign:
+        logger.warning("Solicitud con datos incompletos")
+        return jsonify({"error": "Falta el signo solar"}), 400
+
+    try:
+        # Preparar datos para el análisis geográfico
+        geographic_data = {
+            'sun_sign': sun_sign,
+            'moon_sign': moon_sign or "No disponible",
+            'ascendant': ascendant or "No disponible"
+        }
+
+        # Generar el análisis geográfico
+        geographic_text = generate_geographic_analysis(geographic_data, api_key)
+        if not geographic_text:
+            return jsonify({"error": "No se pudo generar el análisis geográfico"}), 500
+
+        # Simular datos estructurados para los países y ciudades
+        # En una implementación real, estos datos se extraerían del análisis o de una base de datos
+        countries = [
+            {"name": "Estados Unidos", "match": 95, "description": "Energía creativa, oportunidades y expresión personal."},
+            {"name": "Italia", "match": 92, "description": "Historia rica, arte y cultura que resuenan con la apreciación por la belleza."},
+            {"name": "Australia", "match": 90, "description": "Ciudades vibrantes, hermosas playas y estilo de vida al aire libre."},
+            {"name": "España", "match": 88, "description": "Arquitectura creativa, vida callejera vibrante y calidez mediterránea."},
+            {"name": "Francia", "match": 85, "description": "Arte, cultura, gastronomía y elegancia."}
+        ]
+        
+        cities = [
+            {"name": "Roma", "country": "Italia", "match": 95, "description": "Historia antigua, arte y vida urbana vibrante."},
+            {"name": "Florencia", "country": "Italia", "match": 93, "description": "Arte renacentista, arquitectura y significado cultural."},
+            {"name": "Milán", "country": "Italia", "match": 91, "description": "Capital de la moda con energía moderna y diseño."},
+            {"name": "Nápoles", "country": "Italia", "match": 88, "description": "Cultura apasionada, gastronomía y belleza costera."},
+            {"name": "Venecia", "country": "Italia", "match": 86, "description": "Arquitectura única, canales y herencia artística."}
+        ]
+
+        # Preparar respuesta
+        response = {
+            "geographic_analysis": geographic_text,
+            "top_countries": countries,
+            "top_cities": cities,
+            "data": {
+                "sun_sign": sun_sign,
+                "moon_sign": moon_sign,
+                "ascendant": ascendant
+            }
+        }
+
+        logger.info(f"Análisis geográfico generado exitosamente para {sun_sign}")
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud de análisis geográfico: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=5025)

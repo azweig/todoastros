@@ -1,0 +1,265 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import logging
+import requests
+import os
+import json
+import sqlite3
+import hashlib
+from datetime import datetime
+
+# Configuración de logging
+logging.basicConfig(
+  level=logging.INFO,
+  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+  handlers=[
+      logging.FileHandler("astro_chart_service.log"),
+      logging.StreamHandler()
+  ]
+)
+logger = logging.getLogger("astro_chart_service")
+
+app = Flask(__name__)
+CORS(app)
+
+# URLs de los servicios
+AUTH_SERVICE_URL = os.environ.get("AUTH_SERVICE_URL", "http://auth_service:5050")
+ASTRONOMY_SERVICE_URL = os.environ.get("ASTRONOMY_SERVICE_URL", "http://astronomy_service:5003/astronomy")
+ZODIAC_SERVICE_URL = os.environ.get("ZODIAC_SERVICE_URL", "http://zodiac_service:5001/zodiac")
+OPENAI_SERVICE_URL = os.environ.get("OPENAI_SERVICE_URL", "http://openai_service:5010/generate")
+
+# Configuración de la base de datos
+DB_PATH = "/data/astro_chart_responses.db"
+
+def init_db():
+  """Inicializa la base de datos."""
+  os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+  
+  conn = sqlite3.connect(DB_PATH)
+  cursor = conn.cursor()
+  
+  # Crear tabla para almacenar respuestas
+  cursor.execute('''
+  CREATE TABLE IF NOT EXISTS responses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      query_hash TEXT UNIQUE NOT NULL,
+      response_data TEXT NOT NULL,
+      created_at TEXT NOT NULL
+  )
+  ''')
+  
+  conn.commit()
+  conn.close()
+  logger.info("Base de datos inicializada")
+
+def get_query_hash(data):
+  """Genera un hash único para la consulta."""
+  if isinstance(data, dict):
+      # Eliminar campos que no deben afectar el hash (como timestamps)
+      data_copy = data.copy()
+      if 'generated_at' in data_copy:
+          del data_copy['generated_at']
+      
+      # Convertir a string y generar hash
+      data_str = json.dumps(data_copy, sort_keys=True)
+  else:
+      data_str = str(data)
+      
+  return hashlib.md5(data_str.encode()).hexdigest()
+
+def get_stored_response(query_hash):
+  """Obtiene una respuesta almacenada si existe."""
+  conn = sqlite3.connect(DB_PATH)
+  cursor = conn.cursor()
+  
+  cursor.execute(
+      "SELECT response_data FROM responses WHERE query_hash = ?",
+      (query_hash,)
+  )
+  
+  result = cursor.fetchone()
+  conn.close()
+  
+  if result:
+      response_data = json.loads(result[0])
+      return response_data
+  
+  return None
+
+def store_response(query_hash, response):
+  """Almacena una respuesta en la base de datos."""
+  conn = sqlite3.connect(DB_PATH)
+  cursor = conn.cursor()
+  
+  response_json = json.dumps(response)
+  now = datetime.now().isoformat()
+  
+  try:
+      cursor.execute(
+          "INSERT OR REPLACE INTO responses (query_hash, response_data, created_at) VALUES (?, ?, ?)",
+          (query_hash, response_json, now)
+      )
+      conn.commit()
+      logger.info(f"Respuesta almacenada con hash: {query_hash}")
+  except Exception as e:
+      logger.error(f"Error al almacenar respuesta: {str(e)}")
+      conn.rollback()
+  finally:
+      conn.close()
+
+# Inicializar la base de datos al arrancar
+init_db()
+
+@app.route('/health', methods=['GET'])
+def health():
+  """Endpoint para verificar la salud del servicio."""
+  return jsonify({"status": "up"}), 200
+
+
+@app.route('/astro_chart', methods=['POST'])
+def astro_chart():
+    """Endpoint para generar una carta astral personalizada."""
+    try:
+        # Obtener datos de la solicitud
+        data = request.get_json()
+        birth_date = data.get('birth_date', '')
+        birth_time = data.get('birth_time', '')
+        birth_place = data.get('birth_place', '')
+        first_name = data.get('first_name', '')
+        last_name = data.get('last_name', '')
+        basic_version = data.get('basic_version', False)  # Nuevo parámetro para versión básica
+
+        # Validar datos requeridos
+        if not all([birth_date, birth_time, birth_place]):
+            logger.warning("Solicitud con datos incompletos")
+            return jsonify({"error": "Faltan datos obligatorios (fecha, hora o lugar de nacimiento)"}), 400
+
+        # Generar hash para la consulta
+        query_data = {
+            "birth_date": birth_date,
+            "birth_time": birth_time,
+            "birth_place": birth_place,
+            "first_name": first_name,
+            "last_name": last_name,
+            "basic_version": basic_version  # Incluir en el hash para diferenciar versiones
+        }
+        query_hash = get_query_hash(query_data)
+
+        # Verificar si ya existe una respuesta almacenada
+        stored_response = get_stored_response(query_hash)
+        if stored_response:
+            logger.info(f"Usando respuesta almacenada para {birth_date}, {birth_time}, {birth_place}")
+            return jsonify(stored_response)
+
+        # Obtener datos del zodíaco
+        headers = {'X-API-Key': request.headers.get('X-API-Key', '')}
+        zodiac_response = requests.post(
+            ZODIAC_SERVICE_URL,
+            json={"date_of_birth": birth_date},
+            headers=headers
+        )
+
+        if zodiac_response.status_code != 200:
+            logger.error(f"Error al obtener datos del zodíaco: {zodiac_response.text}")
+            return jsonify({"error": "No se pudieron obtener datos del zodíaco"}), 500
+
+        zodiac_data = zodiac_response.json()
+
+        # Preparar el prompt para OpenAI
+        name_str = ""
+        if first_name and last_name:
+            name_str = f" para {first_name} {last_name}"
+        elif first_name:
+            name_str = f" para {first_name}"
+
+        # Ajustar el prompt según la versión (básica o premium)
+        if basic_version:
+            prompt = f"""Genera una carta astral básica{name_str} basada en los siguientes datos:
+- Fecha de nacimiento: {birth_date}
+- Hora de nacimiento: {birth_time}
+- Lugar de nacimiento: {birth_place}
+- Signo solar: {zodiac_data.get('western_zodiac', 'No disponible')}
+
+La carta astral básica debe incluir:
+1. Análisis breve del Sol y la Luna
+2. Características generales de personalidad
+3. Consejos básicos para el desarrollo personal
+
+Utiliza un lenguaje accesible y conciso, limitando la respuesta a aproximadamente 500 palabras."""
+            max_tokens = 1000
+        else:
+            prompt = f"""Genera una carta astral detallada{name_str} basada en los siguientes datos:
+- Fecha de nacimiento: {birth_date}
+- Hora de nacimiento: {birth_time}
+- Lugar de nacimiento: {birth_place}
+- Signo solar: {zodiac_data.get('western_zodiac', 'No disponible')}
+- Signo chino: {zodiac_data.get('chinese_zodiac', 'No disponible')}
+- Signo védico: {zodiac_data.get('vedic_zodiac', 'No disponible')}
+
+La carta astral debe incluir:
+1. Análisis del Sol, Luna y Ascendente
+2. Posiciones planetarias en signos y casas
+3. Aspectos planetarios significativos
+4. Interpretación de la personalidad y potencial de vida
+5. Desafíos y oportunidades según la carta natal
+6. Consejos para el desarrollo personal basados en la carta
+
+Utiliza un lenguaje accesible pero profundo, que combine conocimientos astrológicos tradicionales con psicología moderna."""
+            max_tokens = 2500
+
+        # Enviar solicitud a OpenAI
+        logger.info(f"Enviando solicitud a OpenAI: {OPENAI_SERVICE_URL}")
+        response = requests.post(
+            OPENAI_SERVICE_URL,
+            json={
+                "prompt": prompt,
+                "max_tokens": max_tokens,
+                "temperature": 0.7
+            }
+        )
+
+        # Verificar respuesta
+        if response.status_code != 200:
+            logger.error(f"Error al llamar a OpenAI: {response.status_code} - {response.text}")
+            return jsonify({"error": "No se pudo generar la carta astral"}), 500
+
+        # Extraer texto generado
+        result = response.json()
+        chart_text = result.get("text", "")
+        if not chart_text:
+            logger.error("No se recibió texto de OpenAI")
+            return jsonify({"error": "No se pudo generar la carta astral"}), 500
+
+        # Preparar respuesta
+        response_data = {
+            "chart": chart_text,
+            "birth_date": birth_date,
+            "birth_time": birth_time,
+            "birth_place": birth_place,
+            "first_name": first_name,
+            "last_name": last_name,
+            "is_basic_version": basic_version,
+            "zodiac_info": {
+                "western_zodiac": zodiac_data.get('western_zodiac', 'No disponible'),
+                "chinese_zodiac": zodiac_data.get('chinese_zodiac', 'No disponible') if not basic_version else None,
+                "vedic_zodiac": zodiac_data.get('vedic_zodiac', 'No disponible') if not basic_version else None
+            },
+            "generated_at": datetime.now().isoformat()
+        }
+
+        # Almacenar en la base de datos
+        store_response(query_hash, response_data)
+
+        logger.info(f"Carta astral generada exitosamente para {birth_date}, {birth_time}, {birth_place}")
+        return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"Error al procesar solicitud: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+if __name__ == "__main__":
+  app.run(debug=False, host="0.0.0.0", port=5015)
+
