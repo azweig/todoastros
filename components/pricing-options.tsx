@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckIcon, XIcon, MoonIcon, StarsIcon } from "lucide-react"
+import { Check, X, Moon, Sparkles, Star, Crown, ArrowLeft } from "lucide-react"
 import { useLanguage } from "@/contexts/language-context"
 import { LanguageSwitcher } from "./language-switcher"
 
@@ -16,144 +16,250 @@ export function PricingOptions() {
 
   const handleSelectPlan = (plan: string) => {
     setSelectedPlan(plan)
-
-    // Store the selected plan in localStorage or context
     localStorage.setItem("selectedPlan", plan)
-
-    // Navigate to the form page
     router.push("/form")
   }
 
   return (
-    <div className="py-12 px-4">
-      <div className="absolute top-4 right-4 z-20">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4 relative overflow-hidden">
+      {/* Decorative elements */}
+      <div className="absolute top-20 left-10 animate-float opacity-20">
+        <Star className="h-6 w-6 text-gold" fill="currentColor" />
+      </div>
+      <div className="absolute top-40 right-20 animate-float opacity-20" style={{ animationDelay: '1s' }}>
+        <Sparkles className="h-8 w-8 text-gold" />
+      </div>
+      <div className="absolute bottom-40 left-1/4 animate-float opacity-20" style={{ animationDelay: '2s' }}>
+        <Star className="h-4 w-4 text-gold" fill="currentColor" />
+      </div>
+
+      {/* Language switcher */}
+      <div className="absolute top-6 right-6 z-20">
         <LanguageSwitcher />
       </div>
 
-      <div className="text-center mb-12">
-        <div className="flex justify-center mb-4">
-          <div className="relative">
-            <MoonIcon className="h-12 w-12 text-indigo-600 dark:text-indigo-400" />
-            <StarsIcon className="h-6 w-6 text-yellow-500 absolute -top-1 -right-1" />
-          </div>
-        </div>
-        <h1 className="text-4xl font-bold text-slate-800 dark:text-white mb-4">{t("pricing.title")}</h1>
-        <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">{t("pricing.subtitle")}</p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-        {/* Free Plan */}
-        <Card className="border-2 border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">{t("pricing.free.title")}</CardTitle>
-            <div className="text-4xl font-bold mt-4 mb-2 text-slate-800 dark:text-white">{t("pricing.free.price")}</div>
-            <CardDescription>{t("pricing.free.desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-3">
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.basic.analysis")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.compatibility")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.general.predictions")}</span>
-              </li>
-              <li className="flex items-start">
-                <XIcon className="h-5 w-5 text-slate-400 mr-2 flex-shrink-0 mt-0.5" />
-                <span className="text-slate-500 dark:text-slate-400">{t("feature.no.exact.time")}</span>
-              </li>
-              <li className="flex items-start">
-                <XIcon className="h-5 w-5 text-slate-400 mr-2 flex-shrink-0 mt-0.5" />
-                <span className="text-slate-500 dark:text-slate-400">{t("feature.no.music")}</span>
-              </li>
-              <li className="flex items-start">
-                <XIcon className="h-5 w-5 text-slate-400 mr-2 flex-shrink-0 mt-0.5" />
-                <span className="text-slate-500 dark:text-slate-400">{t("feature.no.historical")}</span>
-              </li>
-              <li className="flex items-start">
-                <XIcon className="h-5 w-5 text-slate-400 mr-2 flex-shrink-0 mt-0.5" />
-                <span className="text-slate-500 dark:text-slate-400">{t("feature.no.weather")}</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button
-              onClick={() => handleSelectPlan("free")}
-              className="w-full bg-slate-200 hover:bg-slate-300 text-slate-800"
-            >
-              {t("pricing.free.select")}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Premium Plan */}
-        <Card className="border-2 border-indigo-500 dark:border-indigo-400 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 relative">
-          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-            {t("pricing.recommended")}
-          </div>
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">{t("pricing.premium.title")}</CardTitle>
-            <div className="text-4xl font-bold mt-4 mb-2 text-indigo-600 dark:text-indigo-400">
-              {t("pricing.premium.price")}
-            </div>
-            <CardDescription>{t("pricing.premium.desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-3">
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.detailed.analysis")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.houses")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.planetary")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.exact.time")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.music")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.historical")}</span>
-              </li>
-              <li className="flex items-start">
-                <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>{t("feature.weather")}</span>
-              </li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button
-              onClick={() => handleSelectPlan("premium")}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              {t("pricing.premium.select")}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-
-      <div className="text-center mt-12">
+      {/* Back button */}
+      <div className="absolute top-6 left-6">
         <Link href="/">
-          <Button variant="link" className="text-slate-600 dark:text-slate-300">
-            {t("pricing.back")}
+          <Button variant="ghost" className="text-foreground/70 hover:text-foreground">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            {t("pricing.back") || "Volver"}
           </Button>
         </Link>
+      </div>
+
+      <div className="max-w-6xl mx-auto pt-8">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gold/20 rounded-full blur-xl" />
+              <div className="relative bg-gradient-to-br from-primary to-secondary p-4 rounded-full border border-gold/30 shadow-gold">
+                <Moon className="h-10 w-10 text-gold" />
+              </div>
+            </div>
+          </div>
+          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
+            {t("pricing.title") || "Elige tu Carta Astral"}
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            {t("pricing.subtitle") || "Descubre los secretos que el universo tiene guardados para ti"}
+          </p>
+        </div>
+
+        {/* Pricing cards */}
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {/* Free Plan */}
+          <Card className="pricing-card border-border/50 hover:border-gold/30 transition-all duration-300 group">
+            <CardHeader className="text-center pb-2">
+              <div className="flex justify-center mb-4">
+                <div className="p-3 rounded-full bg-muted group-hover:bg-gold/10 transition-colors">
+                  <Star className="h-8 w-8 text-muted-foreground group-hover:text-gold transition-colors" />
+                </div>
+              </div>
+              <CardTitle className="font-display text-2xl font-bold">
+                {t("pricing.free.title") || "Carta Básica"}
+              </CardTitle>
+              <div className="mt-4 mb-2">
+                <span className="text-5xl font-bold text-foreground">
+                  {t("pricing.free.price") || "Gratis"}
+                </span>
+              </div>
+              <CardDescription className="text-muted-foreground">
+                {t("pricing.free.desc") || "Análisis introductorio de tu signo solar"}
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="pt-6">
+              <ul className="space-y-4">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                  </div>
+                  <span className="text-foreground/80">{t("feature.basic.analysis") || "Análisis de signo solar"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                  </div>
+                  <span className="text-foreground/80">{t("feature.compatibility") || "Compatibilidad básica"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                  </div>
+                  <span className="text-foreground/80">{t("feature.general.predictions") || "Predicciones generales"}</span>
+                </li>
+                <li className="flex items-start opacity-50">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <span className="text-muted-foreground">{t("feature.no.exact.time") || "Sin hora exacta de nacimiento"}</span>
+                </li>
+                <li className="flex items-start opacity-50">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <span className="text-muted-foreground">{t("feature.no.music") || "Sin música de tu época"}</span>
+                </li>
+                <li className="flex items-start opacity-50">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <span className="text-muted-foreground">{t("feature.no.historical") || "Sin eventos históricos"}</span>
+                </li>
+              </ul>
+            </CardContent>
+            
+            <CardFooter className="pt-6">
+              <Button
+                onClick={() => handleSelectPlan("free")}
+                variant="outline"
+                className="w-full py-6 text-lg border-2 hover:border-gold hover:bg-gold/5 transition-all"
+              >
+                {t("pricing.free.select") || "Comenzar Gratis"}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Premium Plan */}
+          <Card className="pricing-card featured relative overflow-hidden">
+            {/* Recommended badge */}
+            <div className="absolute -top-px left-1/2 transform -translate-x-1/2">
+              <div className="bg-gradient-gold text-primary-dark px-6 py-1.5 rounded-b-lg text-sm font-semibold flex items-center gap-2 shadow-gold">
+                <Crown className="h-4 w-4" />
+                {t("pricing.recommended") || "Recomendado"}
+              </div>
+            </div>
+            
+            <CardHeader className="text-center pb-2 pt-10">
+              <div className="flex justify-center mb-4">
+                <div className="p-3 rounded-full bg-gold/20">
+                  <Sparkles className="h-8 w-8 text-gold" />
+                </div>
+              </div>
+              <CardTitle className="font-display text-2xl font-bold text-gradient">
+                {t("pricing.premium.title") || "Carta Premium"}
+              </CardTitle>
+              <div className="mt-4 mb-2">
+                <span className="text-5xl font-bold text-foreground">
+                  {t("pricing.premium.price") || "$9.99"}
+                </span>
+                <span className="text-muted-foreground ml-2">USD</span>
+              </div>
+              <CardDescription className="text-muted-foreground">
+                {t("pricing.premium.desc") || "Cosmograma natal completo con numerología"}
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="pt-6">
+              <ul className="space-y-4">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.detailed.analysis") || "Análisis detallado Sol, Luna y Ascendente"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.houses") || "12 casas astrológicas completas"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.planetary") || "Posiciones planetarias exactas"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.exact.time") || "Cálculo con hora exacta"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.music") || "Música popular de tu nacimiento"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.numerology") || "Numerología completa del nombre"}</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-0.5 mr-3">
+                    <Check className="h-5 w-5 text-gold" />
+                  </div>
+                  <span className="text-foreground/90 font-medium">{t("feature.pdf") || "PDF profesional descargable"}</span>
+                </li>
+              </ul>
+            </CardContent>
+            
+            <CardFooter className="pt-6">
+              <Button
+                onClick={() => handleSelectPlan("premium")}
+                className="w-full py-6 text-lg btn-gold font-semibold"
+              >
+                <Sparkles className="mr-2 h-5 w-5" />
+                {t("pricing.premium.select") || "Obtener Premium"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+
+        {/* Trust indicators */}
+        <div className="flex flex-wrap justify-center gap-8 mt-16 text-muted-foreground text-sm">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-full bg-green-500/10">
+              <Check className="h-4 w-4 text-green-500" />
+            </div>
+            <span>Pago seguro SSL</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-full bg-green-500/10">
+              <Check className="h-4 w-4 text-green-500" />
+            </div>
+            <span>Entrega inmediata</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-full bg-green-500/10">
+              <Check className="h-4 w-4 text-green-500" />
+            </div>
+            <span>Garantía de satisfacción</span>
+          </div>
+        </div>
+
+        {/* Footer quote */}
+        <div className="text-center mt-16">
+          <p className="text-muted-foreground italic">
+            "Los astros no obligan, pero sí inclinan. Tu voluntad es el timón."
+          </p>
+        </div>
       </div>
     </div>
   )
 }
-
